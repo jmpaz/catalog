@@ -1,0 +1,5 @@
+transformers
+accelerate
+torch==2.1.*
+flash-attn
+pysrt
