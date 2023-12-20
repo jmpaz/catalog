@@ -1,14 +1,10 @@
 from datetime import datetime, timedelta
-from transcribe.transcribe import accumulate_time
 import pysrt
 
 
 def hf_pipeline_to_srt(json_result, output_file=None):
-    # Accumulate time for each chunk
-    accumulated_chunks = accumulate_time(json_result["chunks"])
-
     file = pysrt.SubRipFile()
-    for idx, chk in enumerate(accumulated_chunks):
+    for idx, chk in enumerate(json_result["chunks"]):
         text = chk["text"]
         start, end = map(convert_time, chk["timestamp"])
 
@@ -41,13 +37,11 @@ def convert_time(data):
 
 
 def hf_pipeline_to_lrc(json_result, output_file=None):
-    accumulated_chunks = accumulate_time(json_result["chunks"])
-
     lrc_lines = []
 
-    for idx, chunk in enumerate(accumulated_chunks):
-        # Extract start and end times for each chunk
-        start_time, end_time = chunk["timestamp"]
+    for idx, chunk in enumerate(json_result["chunks"]):
+        # Extract start time for each chunk
+        start_time = chunk["timestamp"][0]
 
         # Convert start time to LRC format
         lrc_line = f"[{convert_time_to_lrc_format(start_time)}] {chunk['text']}"

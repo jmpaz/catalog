@@ -28,24 +28,6 @@ pipe = pipeline(
 )
 
 
-def accumulate_time(chunks):
-    accumulated_time = 0
-    new_chunks = []
-
-    for chunk in chunks:
-        new_start = round(accumulated_time, 3)  # Round to three decimal places
-        duration = round(chunk["timestamp"][1] - chunk["timestamp"][0], 3)
-        new_end = new_start + duration
-        accumulated_time = new_end
-
-        new_chunk = chunk.copy()
-        new_chunk["timestamp"] = [new_start, new_end]
-        new_chunks.append(new_chunk)
-
-    return new_chunks
-
-
 def transcribe_audio(file_path):
     result = pipe(file_path, return_timestamps=True)
-    result["chunks"] = accumulate_time(result["chunks"])
     return result
