@@ -1,3 +1,7 @@
 .venv
 data
 __pycache__
+
+*.lrc
+*.srt
+*.json
