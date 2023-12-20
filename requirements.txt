@@ -1,5 +1,1 @@
-transformers
-accelerate
-torch==2.1.*
-flash-attn
-pysrt
+git+https://github.com/m-bain/whisperX.git

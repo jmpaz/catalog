@@ -1,33 +1,38 @@
-import torch
-from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
-
-device = "cuda:0"
-torch_dtype = torch.float16
-
-model_id = "distil-whisper/distil-large-v2"
-
-model = AutoModelForSpeechSeq2Seq.from_pretrained(
-    model_id,
-    torch_dtype=torch_dtype,
-    low_cpu_mem_usage=True,
-    use_safetensors=True,
-    # attn_implementation="flash_attention_2",
-)
-model.to(device)
-
-processor = AutoProcessor.from_pretrained(model_id)
-
-pipe = pipeline(
-    "automatic-speech-recognition",
-    model=model,
-    tokenizer=processor.tokenizer,
-    feature_extractor=processor.feature_extractor,
-    max_new_tokens=128,
-    torch_dtype=torch_dtype,
-    device=device,
-)
+import subprocess
 
 
-def transcribe_audio(file_path):
-    result = pipe(file_path, return_timestamps=True)
-    return result
+def call_whisperx(
+    input_path,
+    output_dir,
+    model="large-v2",
+    language="en",
+    output_format="srt",
+    speaker_count=None,
+    device_index=None,
+):
+    cmd = [
+        "whisperx",
+        input_path,
+        "--model",
+        model,
+        "--language",
+        language,
+        "--output_format",
+        output_format,
+    ]
+
+    if speaker_count:
+        cmd.extend(
+            ["--min_speakers", str(speaker_count), "--max_speakers", str(speaker_count)]
+        )
+
+    if device_index is not None:
+        cmd.extend(["--device_index", str(device_index)])
+
+    # Add output directory argument
+    cmd.extend(["--output_dir", output_dir])
+
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred while running whisperx: {e}")
