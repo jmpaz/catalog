@@ -5,9 +5,7 @@ from transcribe.transcribe import call_whisperx, convert_to_lrc
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="Transcribe audio and convert to various formats."
-    )
+    parser = argparse.ArgumentParser(description="Transcribe audio with WhisperX.")
     parser.add_argument(
         "input_path", help="Path to the audio file or directory to transcribe."
     )
@@ -23,6 +21,21 @@ def parse_arguments():
         choices=["srt", "json", "lrc"],
         default="srt",
         help="Output format: 'srt', 'json', 'lrc'.",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing files without prompt.",
+    )
+    parser.add_argument(
+        "--speaker_count",
+        type=int,
+        help="Set minimum and maximum number of speakers.",
+    )
+    parser.add_argument(
+        "--device_index",
+        type=int,
+        help="Index of the device to use.",
     )
     return parser.parse_args()
 
@@ -43,8 +56,10 @@ if __name__ == "__main__":
 
     call_whisperx(
         args.input_path,
-        args.output,
-        output_format=args.format if args.format else "srt",
+        temp_dir,
+        output_format="srt",
+        speaker_count=args.speaker_count,
+        device_index=args.device_index,
     )
 
     # Convert to LRC format if specified, then remove the temporary directory

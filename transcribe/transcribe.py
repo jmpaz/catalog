@@ -17,22 +17,25 @@ def call_whisperx(
         input_path,
         "--model",
         model,
-        "--language",
-        language,
         "--output_format",
         output_format,
+        "--output_dir",
+        output_dir,
     ]
 
+    if language:
+        cmd += ["--language", language]
+
     if speaker_count:
-        cmd.extend(
-            ["--min_speakers", str(speaker_count), "--max_speakers", str(speaker_count)]
-        )
+        cmd += [
+            "--min_speakers",
+            str(speaker_count),
+            "--max_speakers",
+            str(speaker_count),
+        ]
 
     if device_index is not None:
-        cmd.extend(["--device_index", str(device_index)])
-
-    # Add output directory argument
-    cmd.extend(["--output_dir", output_dir])
+        cmd += ["--device_index", str(device_index)]
 
     try:
         subprocess.run(cmd, check=True)
