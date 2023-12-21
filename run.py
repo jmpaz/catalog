@@ -16,16 +16,17 @@ def parse_arguments():
         help="Output directory for the files. Default is 'data/processed'.",
     )
     parser.add_argument(
+        "--relocate_files",
+        action="store_true",
+        default=True,
+        help="Move transcribed audio files to the output directory upon completion.",
+    )
+    parser.add_argument(
         "-f",
         "--format",
         choices=["srt", "json", "lrc"],
         default="srt",
         help="Output format: 'srt', 'json', 'lrc'.",
-    )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite existing files without prompt.",
     )
     parser.add_argument(
         "--speaker_count",
@@ -48,9 +49,12 @@ def process_audio_file(file_path, temp_dir, args):
         speaker_count=args.speaker_count,
         device_index=args.device_index,
     )
-
     if args.format == "lrc":
         convert_to_lrc(temp_dir, args.output)
+    if args.relocate_files:
+        shutil.move(file_path, args.output)
+
+
 def process_directory(directory_path, args):
     temp_dir = "tmp" if args.format == "lrc" else args.output
     os.makedirs(temp_dir, exist_ok=True)
