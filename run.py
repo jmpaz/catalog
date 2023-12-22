@@ -38,6 +38,11 @@ def parse_arguments():
         type=int,
         help="Index of the device to use.",
     )
+    parser.add_argument(
+        "--prompt",
+        type=str,
+        help="Initial prompt to use.",
+    )
     return parser.parse_args()
 
 
@@ -48,6 +53,7 @@ def process_audio_file(file_path, temp_dir, args):
         output_format="srt",
         speaker_count=args.speaker_count,
         device_index=args.device_index,
+        initial_prompt=args.prompt,
     )
     if args.format == "lrc":
         convert_to_lrc(temp_dir, args.output)
@@ -72,6 +78,11 @@ if __name__ == "__main__":
 
     if not os.path.exists(args.input_path):
         raise FileNotFoundError(f"Input path {args.input_path} does not exist.")
+    elif os.path.isdir(args.input_path) and not os.listdir(args.input_path):
+        raise FileNotFoundError(f"Input directory {args.input_path} is empty.")
+
+    if not os.path.exists(args.output):
+        os.makedirs(args.output)
 
     if os.path.isdir(args.input_path):
         process_directory(args.input_path, args)

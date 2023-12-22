@@ -11,6 +11,7 @@ def call_whisperx(
     output_format="srt",
     speaker_count=None,
     device_index=None,
+    initial_prompt=None,
 ):
     cmd = [
         "whisperx",
@@ -33,6 +34,9 @@ def call_whisperx(
             "--max_speakers",
             str(speaker_count),
         ]
+
+    if initial_prompt:
+        cmd += ["--initial_prompt", initial_prompt]
 
     if device_index is not None:
         cmd += ["--device_index", str(device_index)]
