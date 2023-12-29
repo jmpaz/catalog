@@ -3,9 +3,18 @@ import os
 import shutil
 from core.transcribe import call_whisperx, convert_to_lrc
 
+from utils.logging import Logger
 
-def transcribe(args):
+
+def transcribe(args, logger):
     def process_audio_file(file_path, temp_dir, args):
+        whisperx_info = {
+            "file_path": file_path,
+            "output_format": "srt",
+            "speaker_count": args.speaker_count,
+            "device_index": args.device_index,
+            "initial_prompt": args.prompt if args.prompt else "N/A",
+        }
         call_whisperx(
             file_path,
             temp_dir,
@@ -14,6 +23,8 @@ def transcribe(args):
             device_index=args.device_index,
             initial_prompt=args.prompt,
         )
+        logger.log_whisperx_call(file_path, whisperx_info)
+
         if args.format == "lrc":
             convert_to_lrc(temp_dir, args.output)
         if args.relocate_files == "true":
@@ -95,7 +106,12 @@ def main():
     if args.command is None:
         parser.print_help()
     else:
-        args.func(args)
+        logger = Logger("logs/log.json")
+        logger.log_session_start(args)
+
+        args.func(args, logger)
+
+        logger.save_log()
 
 
 if __name__ == "__main__":
