@@ -1,7 +1,7 @@
 import argparse
 import os
 import shutil
-from transcribe.transcribe import call_whisperx, convert_to_lrc
+from core.transcribe import call_whisperx, convert_to_lrc
 
 
 def parse_arguments():
