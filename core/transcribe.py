@@ -12,6 +12,7 @@ def call_whisperx(
     speaker_count=None,
     device_index=None,
     initial_prompt=None,
+    verbose=False,
 ):
     cmd = [
         "whisperx",
@@ -41,10 +42,17 @@ def call_whisperx(
     if device_index is not None:
         cmd += ["--device_index", str(device_index)]
 
+    # Capture whisperx output and print if verbose
     try:
-        subprocess.run(cmd, check=True)
+        process = subprocess.run(
+            cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+
+        if verbose:
+            print(process.stdout.decode())
+
     except subprocess.CalledProcessError as e:
-        print(f"An error occurred while running whisperx: {e}")
+        print(f"An error occurred while running whisperx: {e.stderr.decode()}")
 
 
 def srt_timestamp_to_lrc(timestamp):
