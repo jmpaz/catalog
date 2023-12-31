@@ -6,28 +6,38 @@ from datetime import datetime
 class Logger:
     def __init__(self, log_file):
         self.log_file = log_file
-        self.log_data = {"session_start": None, "commands": []}
+        self.log_data = self._read_existing_log() or {"sessions": []}
 
-    def log_session_start(self, args):
-        args_dict = {
-            k: str(v) for k, v in vars(args).items() if k != "func"
-        }  # Convert all args to strings, ommitting 'func'
-        self.log_data["session_start"] = {
-            "timestamp": datetime.now().isoformat(),
-            "arguments": args_dict,
+    def _read_existing_log(self):
+        if os.path.exists(self.log_file):
+            with open(self.log_file, "r") as file:
+                return json.load(file)
+        return None
+
+    def start_session(self, args):
+        self.current_session = {
+            "start_time": datetime.now().isoformat(),
+            "arguments": {k: str(v) for k, v in vars(args).items() if k != "func"},
+            "files_processed": [],
         }
 
-    def log_whisperx_call(self, file_path, additional_info):
-        self.log_data["commands"].append(
+    def log_file_process(self, file_path, start_time, end_time):
+        self.current_session["files_processed"].append(
             {
-                "timestamp": datetime.now().isoformat(),
                 "file": file_path,
-                "details": additional_info,
+                "start_time": start_time.isoformat(),
+                "end_time": end_time.isoformat(),
+                "duration": str(end_time - start_time),
             }
         )
 
+    def end_session(self):
+        self.current_session["end_time"] = datetime.now().isoformat()
+        self.current_session["session_duration"] = str(
+            datetime.now() - datetime.fromisoformat(self.current_session["start_time"])
+        )
+        self.log_data["sessions"].append(self.current_session)
+
     def save_log(self):
-        if not os.path.exists(os.path.dirname(self.log_file)):
-            os.makedirs(os.path.dirname(self.log_file))
         with open(self.log_file, "w") as file:
             json.dump(self.log_data, file, indent=4)
