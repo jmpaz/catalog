@@ -8,6 +8,10 @@ from utils.logging import Logger
 
 def process_audio_file(file_path, temp_dir, args, logger):
     start_time = datetime.now()
+
+    if args.verbose:
+        print(f"Transcribing {file_path}...")
+
     call_whisperx(
         file_path,
         temp_dir,
@@ -25,6 +29,9 @@ def process_audio_file(file_path, temp_dir, args, logger):
     end_time = datetime.now()
     logger.log_file_process(file_path, start_time, end_time)
 
+    if args.verbose:
+        print(f"Finished processing {file_path}. Duration: {end_time - start_time}\n")
+
 
 def process_directory(directory_path, args, logger):
     temp_dir = "tmp" if args.format == "lrc" else args.output
@@ -39,6 +46,7 @@ def process_directory(directory_path, args, logger):
 
 
 def transcribe(args, logger):
+    print(f"Transcribe command received for {args.input_path}. Starting...\n")
     logger.start_session(args)
 
     if not os.path.exists(args.input_path):
@@ -65,6 +73,9 @@ def main():
     parser = argparse.ArgumentParser(
         description="CLI for audio transcription and processing."
     )
+
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output.")
+
     subparsers = parser.add_subparsers(help="sub-command help", dest="command")
 
     parser_transcribe = subparsers.add_parser(
@@ -102,6 +113,9 @@ def main():
     parser_transcribe.set_defaults(func=transcribe)
 
     args = parser.parse_args()
+
+    if args.verbose:
+        print("Verbose mode enabled.")
 
     if args.command is None:
         parser.print_help()
