@@ -2,12 +2,31 @@ import argparse
 import os
 import shutil
 from datetime import datetime
+from rich.console import Console
+from rich.progress import Progress, TextColumn, BarColumn
 from core.transcribe import Transcriber
 from utils.logging import Logger
 
 
+def format_duration(duration):
+    total_seconds = int(duration.total_seconds())
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    duration_parts = []
+    if hours:
+        duration_parts.append(f"{hours}h")
+    if minutes or (hours and not seconds):
+        duration_parts.append(f"{minutes}m")
+    if seconds or not (hours or minutes):
+        duration_parts.append(f"{seconds}s")
+
+    return " ".join(duration_parts)
+
+
 class ArgParser:
     def __init__(self):
+        self.console = Console()
         self.parser = argparse.ArgumentParser(
             description="CLI for audio transcription and processing."
         )
@@ -61,7 +80,9 @@ class ArgParser:
         return self.parser.parse_args()
 
     def transcribe(self, args, logger):
-        print(f"Transcribe command received for {args.input_path}. Starting...\n")
+        print(
+            f"Transcribe command received for {args.input_path}.\n",
+        )
         logger.start_session(args)
 
         if not os.path.exists(args.input_path):
@@ -111,19 +132,42 @@ class ArgParser:
 
         if args.verbose:
             print(
-                f"Finished processing {file_path}. Duration: {end_time - start_time}\n"
+                f"Finished processing {file_path} in {format_duration(end_time - start_time)}\n"
             )
 
     def process_directory(self, directory_path, args, logger, transcriber):
+        self.console.print(f"Processing directory: {directory_path}", style="bold")
+        start_time = datetime.now()
+        file_list = os.listdir(directory_path)
+        total_files = len(file_list)
+
         temp_dir = "tmp" if args.format == "lrc" else args.output
         os.makedirs(temp_dir, exist_ok=True)
 
-        for filename in os.listdir(directory_path):
-            file_path = os.path.join(directory_path, filename)
-            self.process_audio_file(file_path, temp_dir, args, logger, transcriber)
+        with Progress(
+            "[progress.description]{task.description}",
+            BarColumn(bar_width=40),
+            TextColumn("[bold]{task.fields[file_count]}", justify="right"),
+            console=self.console,
+        ) as progress:
+            task_id = progress.add_task(
+                "", total=total_files, file_count=f"0/{total_files}"
+            )
+            for index, filename in enumerate(file_list, start=1):
+                file_path = os.path.join(directory_path, filename)
+                self.process_audio_file(file_path, temp_dir, args, logger, transcriber)
+                progress.update(task_id, advance=1, file_count=f"{index}/{total_files}")
 
         if args.format == "lrc":
+            Transcriber.convert_to_lrc(temp_dir, args.output)
             shutil.rmtree(temp_dir)
+
+        end_time = datetime.now()
+        duration = format_duration(end_time - start_time)
+        self.console.print(
+            f"Finished processing {total_files} files in {duration}.",
+            style="green bold",
+        )
 
 
 def main():
