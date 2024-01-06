@@ -3,6 +3,7 @@ import os
 import shutil
 from datetime import datetime
 from rich.console import Console
+from rich.progress import SpinnerColumn
 from rich.progress import Progress, TextColumn, BarColumn
 from core.transcribe import Transcriber
 from utils.logging import Logger
@@ -148,6 +149,7 @@ class ArgParser:
             "[progress.description]{task.description}",
             BarColumn(bar_width=40),
             TextColumn("[bold]{task.fields[file_count]}", justify="right"),
+            SpinnerColumn(spinner_name="dots", style="bold green"),
             console=self.console,
         ) as progress:
             task_id = progress.add_task(
