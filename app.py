@@ -7,6 +7,7 @@ from rich.progress import SpinnerColumn
 from rich.progress import Progress, TextColumn, BarColumn
 from core.transcribe import Transcriber
 from utils.logging import Logger
+from utils.conversion import to_lrc
 
 
 def format_duration(duration):
@@ -99,7 +100,8 @@ class ArgParser:
         if os.path.isdir(args.input_path):
             self.process_directory(args.input_path, args, logger, transcriber)
         else:
-            temp_dir = "tmp" if args.format == "lrc" else args.output
+            # If the input is a single file, create a temporary directory to store the output
+            temp_dir = ".tmp" if args.format == "lrc" else args.output
             os.makedirs(temp_dir, exist_ok=True)
             self.process_audio_file(
                 args.input_path, temp_dir, args, logger, transcriber
@@ -124,7 +126,7 @@ class ArgParser:
         )
 
         if args.format == "lrc":
-            Transcriber.convert_to_lrc(temp_dir, args.output)
+            to_lrc(temp_dir, args.output)
         if args.relocate_files == "true":
             shutil.move(file_path, args.output)
 
@@ -142,7 +144,7 @@ class ArgParser:
         file_list = os.listdir(directory_path)
         total_files = len(file_list)
 
-        temp_dir = "tmp" if args.format == "lrc" else args.output
+        temp_dir = ".tmp" if args.format == "lrc" else args.output
         os.makedirs(temp_dir, exist_ok=True)
 
         with Progress(
@@ -161,7 +163,7 @@ class ArgParser:
                 progress.update(task_id, advance=1, file_count=f"{index}/{total_files}")
 
         if args.format == "lrc":
-            Transcriber.convert_to_lrc(temp_dir, args.output)
+            to_lrc(temp_dir, args.output)
             shutil.rmtree(temp_dir)
 
         end_time = datetime.now()
