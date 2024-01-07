@@ -141,7 +141,7 @@ class ArgParser:
     def process_directory(self, directory_path, args, logger, transcriber):
         self.console.print(f"Processing directory: {directory_path}", style="bold")
         start_time = datetime.now()
-        file_list = os.listdir(directory_path)
+        file_list = sorted(os.listdir(directory_path))
         total_files = len(file_list)
 
         temp_dir = ".tmp" if args.format == "lrc" else args.output
