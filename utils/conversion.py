@@ -30,3 +30,21 @@ def to_lrc(input_dir, output_dir):
             srt_path = os.path.join(input_dir, srt_file)
             lrc_path = os.path.join(output_dir, os.path.splitext(srt_file)[0] + ".lrc")
             convert_srt_to_lrc(srt_path, lrc_path)
+
+
+def insert_lrc(lrc_file_path, audio_filename, template_path):
+    """
+    Injects the entire LRC content into a Markdown template.
+    The template file's contents are left untouched, except:
+    - the insertion point, denoted by `LRC_DEST` in the template, is replaced with the LRC content
+    - the file name, denoted by `source [[FILE_NAME.ext]]` (within brackets), is replaced with the audio file name and extension
+
+    The resultant Markdown-formatted string is returned.
+    """
+    with open(template_path, "r") as template:
+        template_content = template.read()
+        with open(lrc_file_path, "r") as lrc:
+            lrc_content = lrc.read()
+            return template_content.replace("LRC_DEST", lrc_content).replace(
+                "[[FILE_NAME.ext]]", f"[[{audio_filename}]]"
+            )
