@@ -86,7 +86,15 @@ class AudioHandler:
     def process_directory(self, directory_path):
         self.console.print(f"Processing directory: {directory_path}", style="bold")
         start_time = datetime.now()
-        file_list = sorted(os.listdir(directory_path))
+
+        def is_supported(filename):
+            supported_extensions = ["flac", "m4a", "mp3", "mp4", "ogg", "wav", "webm"]
+            return os.path.isfile(os.path.join(directory_path, filename)) and any(
+                filename.endswith(ext) for ext in supported_extensions
+            )
+
+        # Filter out non-audio files and directories
+        file_list = sorted(filter(is_supported, os.listdir(directory_path)))
         total_files = len(file_list)
 
         with Progress(
