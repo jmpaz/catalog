@@ -104,10 +104,6 @@ class AudioHandler:
                 self.process_audio_file(file_path)
                 progress.update(task_id, advance=1, file_count=f"{index}/{total_files}")
 
-        if self.args.format == "lrc":
-            to_lrc(self.temp_dir, self.args.output)
-            shutil.rmtree(self.temp_dir)
-
         end_time = datetime.now()
         duration = format_duration(end_time - start_time)
         self.console.print(
