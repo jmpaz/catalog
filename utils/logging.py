@@ -51,6 +51,17 @@ class Logger:
             }
         )
 
+    def log_sync_session(self, action, dest_path, files):
+        # Create a summary of the pull session
+        session_summary = {
+            "timestamp": datetime.now().isoformat(),
+            "action": action,  # "synced" or "deleted"
+            "destination": dest_path,
+            "file_count": len(files),
+            "files": files,
+        }
+        self.current_session.setdefault("pull_sessions", []).append(session_summary)
+
     def end_session(self):
         self.current_session["end_time"] = datetime.now().isoformat()
         self.current_session["session_duration"] = str(

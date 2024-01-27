@@ -10,6 +10,9 @@ from rich.progress import Progress, TextColumn, BarColumn, SpinnerColumn
 
 def sync_files(source_dirs, dest_dir="data/imports", use_delete=True, logger=None):
     console = Console()
+    synced_files = []
+    deleted_files = []
+
     for source_dir in source_dirs:
         try:
             source_dir = os.path.join(source_dir, "")
@@ -22,18 +25,74 @@ def sync_files(source_dirs, dest_dir="data/imports", use_delete=True, logger=Non
                 command.append("--delete")
             command.extend([source_dir, dest_path])
 
-            subprocess.run(command, check=True)
+            with subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            ) as proc:
+                if proc.stdout:
+                    for line in proc.stdout:
+                        clean_line = line.strip()
+                        # Check if the line is a file or a directory
+                        if (
+                            clean_line
+                            and "/" not in clean_line
+                            and not clean_line.endswith(":")
+                            and not any(
+                                clean_line.startswith(prefix)
+                                for prefix in [
+                                    "sending incremental file list",
+                                    "sent ",
+                                    "total size ",
+                                    "created directory",
+                                ]
+                            )
+                            and clean_line != "./"
+                        ):
+                            if clean_line.startswith("deleting "):
+                                deleted_file = clean_line.replace("deleting ", "")
+                                deleted_files.append(deleted_file)
+                                console.log(
+                                    f"Deleted {deleted_file}"
+                                )  # Print deletion info
+                            else:
+                                synced_files.append(clean_line)
+                                console.log(
+                                    f"Synchronized {clean_line}"
+                                )  # Print sync info
 
+                if proc.wait() != 0:
+                    raise subprocess.CalledProcessError(proc.returncode, command)
+
+            # Log the summary or no changes message after the synchronization is complete
             if logger:
-                logger.info(f"Synchronized {source_dir} to {dest_path}.")
-            else:
-                console.log(f"Synchronized {source_dir} to {dest_path}.")
+                if synced_files or (deleted_files and use_delete):
+                    if synced_files:
+                        logger.log_sync_session("synced", dest_path, synced_files)
+                    if deleted_files and use_delete:
+                        logger.log_sync_session("deleted", dest_path, deleted_files)
+                else:
+                    logger.log_sync_session("no_changes", dest_path, [])
+                    console.log(f"No changes for {dest_dir}/{base_name}")
         except subprocess.CalledProcessError as e:
-            error_message = f"Rsync failed for {source_dir}. Error: {e}"
             if logger:
-                logger.error(error_message)
+                logger.error(f"rsync failed for {source_dir}. Error: {e}")
             else:
-                console.log(f"[bold red]{error_message}[/bold red]")
+                console.log(f"[bold red]rsync failed for {source_dir}. Error: {e}")
+
+
+def process_rsync_output(line, dest_path, logger):
+    # Check if the line indicates a file sync or deletion
+    if line.startswith("deleting "):
+        deleted_file = line.replace("deleting ", "").strip()
+        if logger:
+            logger.info(f"Deleted file from {dest_path}: {deleted_file}")
+    elif line and not line.startswith("sent ") and not line.startswith("total size "):
+        synced_file = line.strip()
+        if logger:
+            logger.info(f"Synchronized file to {dest_path}: {synced_file}")
 
 
 def format_duration(duration):
