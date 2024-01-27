@@ -1,9 +1,39 @@
 import os
 import shutil
+import subprocess
 from datetime import datetime
 from core.transcribe import Transcriber
 from utils.conversion import to_lrc
+from rich.console import Console
 from rich.progress import Progress, TextColumn, BarColumn, SpinnerColumn
+
+
+def sync_files(source_dirs, dest_dir="data/imports", use_delete=True, logger=None):
+    console = Console()
+    for source_dir in source_dirs:
+        try:
+            source_dir = os.path.join(source_dir, "")
+            base_name = os.path.basename(source_dir.rstrip("/"))
+            dest_path = os.path.join(dest_dir, base_name)
+
+            # Construct rsync command
+            command = ["rsync", "-avz"]
+            if use_delete:
+                command.append("--delete")
+            command.extend([source_dir, dest_path])
+
+            subprocess.run(command, check=True)
+
+            if logger:
+                logger.info(f"Synchronized {source_dir} to {dest_path}.")
+            else:
+                console.log(f"Synchronized {source_dir} to {dest_path}.")
+        except subprocess.CalledProcessError as e:
+            error_message = f"Rsync failed for {source_dir}. Error: {e}"
+            if logger:
+                logger.error(error_message)
+            else:
+                console.log(f"[bold red]{error_message}[/bold red]")
 
 
 def format_duration(duration):

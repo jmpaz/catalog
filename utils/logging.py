@@ -14,6 +14,26 @@ class Logger:
                 return json.load(file)
         return None
 
+    def info(self, message):
+        # Add an info log to the current session
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "level": "INFO",
+            "message": message,
+        }
+        self.current_session.setdefault("logs", []).append(log_entry)
+        print(f"INFO: {message}")  # Optional: print to console
+
+    def error(self, message):
+        # Add an error log to the current session
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "level": "ERROR",
+            "message": message,
+        }
+        self.current_session.setdefault("logs", []).append(log_entry)
+        print(f"ERROR: {message}")  # Optional: print to console
+
     def start_session(self, args):
         self.current_session = {
             "start_time": datetime.now().isoformat(),

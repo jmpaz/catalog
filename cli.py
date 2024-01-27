@@ -1,7 +1,7 @@
 import argparse
 from rich.console import Console
 from utils.logging import Logger
-from utils.file_handling import AudioHandler
+from utils.file_handling import AudioHandler, sync_files
 
 
 class ArgParser:
@@ -56,6 +56,34 @@ class ArgParser:
         )
         parser_transcribe.set_defaults(func=self.handle_transcription)
 
+        # File import
+        parser_pull = subparsers.add_parser(
+            "pull", help="Synchronize files/folders to a local directory."
+        )
+        parser_pull.add_argument(
+            "source_dirs", nargs="+", help="List of source directories to synchronize."
+        )
+        parser_pull.add_argument(
+            "-d",
+            "--destination",
+            default="data/imports",
+            help="Destination directory for the files. Default is 'data/imports'.",
+        )
+        parser_pull.add_argument(
+            "--no_delete",
+            action="store_false",
+            help="Do not delete extraneous files from destination dirs (not set/deletes by default)",
+        )
+        parser_pull.set_defaults(func=self.handle_pull)
+
+    def handle_pull(self, args, logger):
+        logger.start_session(args)
+
+        sync_files(args.source_dirs, args.destination, args.no_delete, logger)
+
+        logger.end_session()
+        logger.save_log()
+
     def handle_transcription(self, args, logger):
         audio_handler = AudioHandler(args, logger, self.console)
         audio_handler.transcribe()
@@ -75,7 +103,12 @@ def main():
         arg_parser.parser.print_help()
     else:
         logger = Logger("logs/log.json")
-        arg_parser.handle_transcription(args, logger)
+        # Call the appropriate handler based on the command
+        if hasattr(args, "func"):
+            args.func(args, logger)
+        else:
+            arg_parser.parser.print_help()
+            print("\nNo valid command provided.")
 
 
 if __name__ == "__main__":
