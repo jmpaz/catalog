@@ -69,17 +69,12 @@ class ArgParser:
             default="data/imports",
             help="Destination directory for the files. Default is 'data/imports'.",
         )
-        parser_pull.add_argument(
-            "--no_delete",
-            action="store_false",
-            help="Do not delete extraneous files from destination dirs (not set/deletes by default)",
-        )
         parser_pull.set_defaults(func=self.handle_pull)
 
     def handle_pull(self, args, logger):
         logger.start_session(args)
 
-        sync_files(args.source_dirs, args.destination, args.no_delete, logger)
+        sync_files(args.source_dirs, args.destination, logger=logger)
 
         logger.end_session()
         logger.save_log()
