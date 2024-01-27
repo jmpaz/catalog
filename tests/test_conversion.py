@@ -1,13 +1,10 @@
 import unittest
 from unittest.mock import patch, mock_open
-from utils.conversion import insert_lrc
+from utils.conversion import extract_lrc_content, prepare_markdown
 
 
 class TestConversion(unittest.TestCase):
-    def test_insert_lrc(self):
-        """
-        Test to ensure Markdown is prepared correctly with mock LRC content and file name.
-        """
+    def test_template_injection(self):
         mock_template_content = (
             "---\n"
             "category:\n"
@@ -28,7 +25,6 @@ class TestConversion(unittest.TestCase):
         )
         audio_filename = "file.wav"
 
-        # Create a custom side_effect function for our mock
         def custom_open(file, mode="r", *args, **kwargs):
             _ = mode, args, kwargs
             if file == "mock_template_path":
@@ -38,10 +34,15 @@ class TestConversion(unittest.TestCase):
             else:
                 raise FileNotFoundError(f"No mock for file path: {file}")
 
-        with patch("builtins.open", side_effect=custom_open):
-            # Call the function under test
-            markdown_content = insert_lrc(
-                "mock_lrc_file_path", audio_filename, "mock_template_path"
+        def mock_exists(path):
+            return path in ["mock_template_path", "mock_lrc_file_path"]
+
+        with patch("builtins.open", side_effect=custom_open), patch(
+            "os.path.exists", side_effect=mock_exists
+        ):
+            lrc_str = extract_lrc_content("mock_lrc_file_path")
+            markdown_content = prepare_markdown(
+                "mock_template_path", lrc_str, audio_filename
             )
 
             # Assert that the markdown content is a string

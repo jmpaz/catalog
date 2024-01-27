@@ -32,19 +32,27 @@ def to_lrc(input_dir, output_dir):
             convert_srt_to_lrc(srt_path, lrc_path)
 
 
-def insert_lrc(lrc_file_path, audio_filename, template_path):
+def extract_lrc_content(lrc_file_path):
     """
-    Injects the entire LRC content into a Markdown template.
-    The template file's contents are left untouched, except:
-    - the insertion point, denoted by `LRC_DEST` in the template, is replaced with the LRC content
-    - the file name, denoted by `source [[FILE_NAME.ext]]` (within brackets), is replaced with the audio file name and extension
+    Extracts the LRC content from a file and returns it as a string.
+    """
+    if not os.path.exists(lrc_file_path):
+        raise FileNotFoundError(f"LRC file not found: {lrc_file_path}")
+    else:
+        with open(lrc_file_path, "r") as target_lrc:
+            lrc_str = target_lrc.read()
+            return lrc_str
 
-    The resultant Markdown-formatted string is returned.
+
+def prepare_markdown(template_src, lrc_str, filename_str):
     """
-    with open(template_path, "r") as template:
-        template_content = template.read()
-        with open(lrc_file_path, "r") as lrc:
-            lrc_content = lrc.read()
-            return template_content.replace("LRC_DEST", lrc_content).replace(
-                "[[FILE_NAME.ext]]", f"[[{audio_filename}]]"
-            )
+    Injects LRC content into a Markdown template. Returns the resultant Markdown string.
+    """
+    if not os.path.exists(template_src):
+        raise FileNotFoundError(f"Template file not found: {template_src}")
+    else:
+        template = open(template_src, "r").read()
+        markdown_content = template.replace(
+            "[[FILE_NAME.ext]]", f"[[{filename_str}]]"
+        ).replace("LRC_DEST", lrc_str)
+    return markdown_content
