@@ -10,10 +10,12 @@ from rich.progress import Progress, TextColumn, BarColumn, SpinnerColumn
 
 def sync_files(source_dirs, dest_dir="data/imports", use_delete=True, logger=None):
     console = Console()
-    synced_files = []
-    deleted_files = []
 
     for source_dir in source_dirs:
+        synced_files = []
+        deleted_files = []
+        changes_made = False  # Flag to track if any changes were made
+
         try:
             source_dir = os.path.join(source_dir, "")
             base_name = os.path.basename(source_dir.rstrip("/"))
@@ -35,47 +37,44 @@ def sync_files(source_dirs, dest_dir="data/imports", use_delete=True, logger=Non
                 if proc.stdout:
                     for line in proc.stdout:
                         clean_line = line.strip()
-                        # Check if the line is a file or a directory
-                        if (
+                        console.log(
                             clean_line
-                            and "/" not in clean_line
-                            and not clean_line.endswith(":")
-                            and not any(
-                                clean_line.startswith(prefix)
-                                for prefix in [
-                                    "sending incremental file list",
-                                    "sent ",
-                                    "total size ",
-                                    "created directory",
-                                ]
-                            )
-                            and clean_line != "./"
+                        )  # Print all rsync output in real-time for visibility
+
+                        # Check if the line is a file operation and filter out rsync status messages
+                        if clean_line and not any(
+                            clean_line.startswith(prefix)
+                            for prefix in [
+                                "sending incremental file list",
+                                "sent ",
+                                "total size ",
+                                "created directory",
+                            ]
                         ):
+                            changes_made = True  # A file operation is present
                             if clean_line.startswith("deleting "):
                                 deleted_file = clean_line.replace("deleting ", "")
                                 deleted_files.append(deleted_file)
-                                console.log(
-                                    f"Deleted {deleted_file}"
-                                )  # Print deletion info
-                            else:
+                            elif (
+                                clean_line != "./"
+                                and "/" not in clean_line
+                                and not clean_line.endswith(":")
+                            ):
                                 synced_files.append(clean_line)
-                                console.log(
-                                    f"Synchronized {clean_line}"
-                                )  # Print sync info
 
                 if proc.wait() != 0:
                     raise subprocess.CalledProcessError(proc.returncode, command)
 
-            # Log the summary or no changes message after the synchronization is complete
+            # Log the file operations after the synchronization is complete
             if logger:
-                if synced_files or (deleted_files and use_delete):
-                    if synced_files:
-                        logger.log_sync_session("synced", dest_path, synced_files)
-                    if deleted_files and use_delete:
-                        logger.log_sync_session("deleted", dest_path, deleted_files)
-                else:
-                    logger.log_sync_session("no_changes", dest_path, [])
-                    console.log(f"No changes for {dest_dir}/{base_name}")
+                logger.log_file_process(synced_files, deleted_files, dest_path)
+            else:
+                # Log and print that no changes were made
+                no_change_message = (
+                    f"No changes were made for {source_dir} to {dest_path}."
+                )
+                console.log(no_change_message)
+
         except subprocess.CalledProcessError as e:
             if logger:
                 logger.error(f"rsync failed for {source_dir}. Error: {e}")
