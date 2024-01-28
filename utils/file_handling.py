@@ -37,9 +37,7 @@ def sync_files(source_dirs, dest_dir="data/imports", use_delete=True, logger=Non
                 if proc.stdout:
                     for line in proc.stdout:
                         clean_line = line.strip()
-                        console.log(
-                            clean_line
-                        )  # Print all rsync output in real-time for visibility
+                        console.log(clean_line)
 
                         # Check if the line is a file operation and filter out rsync status messages
                         if clean_line and not any(
@@ -68,12 +66,11 @@ def sync_files(source_dirs, dest_dir="data/imports", use_delete=True, logger=Non
             # Log the file operations after the synchronization is complete
             if logger:
                 logger.log_file_process(synced_files, deleted_files, dest_path)
-            else:
-                # Log and print that no changes were made
-                no_change_message = (
-                    f"No changes were made for {source_dir} to {dest_path}."
+
+            if not changes_made:
+                console.log(
+                    f"\n{dest_path} is up to date; no changes were made.",
                 )
-                console.log(no_change_message)
 
         except subprocess.CalledProcessError as e:
             if logger:
