@@ -1,7 +1,7 @@
 import os
 import shutil
 from core.transcribe import Transcriber, to_lrc
-from utils.export import export_markdown
+from utils.export import export_markdown, parse_file_details
 
 
 class Orchestrator:
@@ -32,7 +32,7 @@ class Orchestrator:
         for audio_file in audio_files:
             self.process_audio_file(audio_file)
 
-        self.export_and_cleanup()
+        self.export()
 
     def find_audio_files(self, path, valid_formats):
         audio_files = []
@@ -44,31 +44,72 @@ class Orchestrator:
         return audio_files
 
     def process_audio_file(self, audio_file):
+        # Extract date and label from the audio file path
+        date_str, label = self.extract_date_label(audio_file)
+        base_name = os.path.basename(audio_file)
+        file_ext = os.path.splitext(base_name)[1]
+        new_base_name = (
+            f"{label} ({date_str}){file_ext}"
+            if label
+            else f"{os.path.splitext(base_name)[0]} ({date_str}){file_ext}"
+        )
+
+        # Ensure the audio file has not already been processed
+        final_audio_path = os.path.join(self.final_audio_output_dir, new_base_name)
+        if os.path.exists(final_audio_path):
+            print(f"Audio file already processed, skipping: {audio_file}")
+            return
+
         # Transcribe and convert to LRC
         output_dir = os.path.join(self.tmp_dir, "transcriptions")
         os.makedirs(output_dir, exist_ok=True)
         self.transcriber.call_whisperx(audio_file, output_dir)
         to_lrc(output_dir, output_dir)
 
-        # Prepare for markdown export
-        lrc_file = os.path.splitext(os.path.basename(audio_file))[0] + ".lrc"
-        lrc_file_path = os.path.join(output_dir, lrc_file)
+        # Find the generated LRC file
+        lrc_filename = next(
+            (f for f in os.listdir(output_dir) if f.endswith(".lrc")), None
+        )
+        if not lrc_filename:
+            print(f"No LRC file generated for: {audio_file}")
+            return
+
+        lrc_file_path = os.path.join(output_dir, lrc_filename)
         audio_lrc_pair = (audio_file, lrc_file_path)
         export_markdown([audio_lrc_pair], self.tmp_dir, "data/template.md")
 
         # Track the processed audio file
-        self.processed_audio_files.append(audio_file)
+        self.processed_audio_files.append((audio_file, new_base_name))
 
-    def export_and_cleanup(self):
-        # Copy audio files to their destination
-        for audio_file in self.processed_audio_files:
-            shutil.copy(audio_file, self.final_audio_output_dir)
+    def export(self):
+        # Copy audio files to their destination with the new naming convention
+        for audio_file, new_base_name in self.processed_audio_files:
+            shutil.copy(
+                audio_file, os.path.join(self.final_audio_output_dir, new_base_name)
+            )
 
-        # Copy markdown files to their destination
+        # Copy markdown files to their destination with unique names
         for item in os.listdir(self.tmp_dir):
             src_path = os.path.join(self.tmp_dir, item)
             if item.endswith(".md"):
-                shutil.copy(src_path, self.final_md_output_dir)
+                dest_path = os.path.join(self.final_md_output_dir, item)
+                dest_path = self.get_unique_filename(dest_path)
+                shutil.copy(src_path, dest_path)
 
         # Clean up the temporary directory
         shutil.rmtree(self.tmp_dir)
+
+    def get_unique_filename(self, path):
+        # Ensure markdown files are not overwritten
+        base, ext = os.path.splitext(path)
+        counter = 1
+        while os.path.exists(path):
+            path = f"{base} ({counter}){ext}"
+            counter += 1
+        return path
+
+    def extract_date_label(self, audio_file):
+        # Extract the date and label from the audio file path
+        date_str = os.path.basename(os.path.dirname(audio_file))
+        _, label = parse_file_details(audio_file)
+        return date_str, label
