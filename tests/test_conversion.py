@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch, mock_open
-from utils.conversion import extract_lrc_content, prepare_markdown
+from utils.export import extract_lrc_content, prepare_markdown
 
 
 class TestConversion(unittest.TestCase):

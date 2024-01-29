@@ -32,27 +32,3 @@ def to_lrc(input_dir, output_dir):
             convert_srt_to_lrc(srt_path, lrc_path)
 
 
-def extract_lrc_content(lrc_file_path):
-    """
-    Extracts the LRC content from a file and returns it as a string.
-    """
-    if not os.path.exists(lrc_file_path):
-        raise FileNotFoundError(f"LRC file not found: {lrc_file_path}")
-    else:
-        with open(lrc_file_path, "r") as target_lrc:
-            lrc_str = target_lrc.read()
-            return lrc_str
-
-
-def prepare_markdown(template_src, lrc_str, filename_str):
-    """
-    Injects LRC content into a Markdown template. Returns the resultant Markdown string.
-    """
-    if not os.path.exists(template_src):
-        raise FileNotFoundError(f"Template file not found: {template_src}")
-    else:
-        template = open(template_src, "r").read()
-        markdown_content = template.replace(
-            "[[FILE_NAME.ext]]", f"[[{filename_str}]]"
-        ).replace("LRC_DEST", lrc_str)
-    return markdown_content
