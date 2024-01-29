@@ -48,21 +48,19 @@ class Logger:
             "files_processed": [],
         }
 
-    def log_file_process(self, synced_files, deleted_files, dest_path):
-        # Ensure current_session is not None
+    def log_file_process(self, file_path, start_time, end_time):
         if self.current_session is None:
             print("Logging session not started. Unable to log file operations.")
             return
 
-        # Record synced and deleted files in the current session
-        for file in synced_files:
-            self.current_session["files_processed"].append(
-                {"action": "synced", "file": file, "destination": dest_path}
-            )
-        for file in deleted_files:
-            self.current_session["files_processed"].append(
-                {"action": "deleted", "file": file, "destination": dest_path}
-            )
+        self.current_session["files_processed"].append(
+            {
+                "file": file_path,
+                "start_time": start_time.isoformat(),
+                "end_time": end_time.isoformat(),
+                "duration": str(end_time - start_time),
+            }
+        )
 
     def log_sync_session(self, action, dest_path, files):
         # Ensure current_session is not None

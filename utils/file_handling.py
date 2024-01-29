@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.progress import Progress, TextColumn, BarColumn, SpinnerColumn
 
 
-def sync_files(source_dirs, dest_dir="data/imports", use_delete=True, logger=None):
+def sync_files(source_dirs, dest_dir="data/imports", use_delete=True):
     console = Console()
 
     for source_dir in source_dirs:
@@ -62,20 +62,13 @@ def sync_files(source_dirs, dest_dir="data/imports", use_delete=True, logger=Non
                 if proc.wait() != 0:
                     raise subprocess.CalledProcessError(proc.returncode, command)
 
-            # Log the file operations after the synchronization is complete
-            if logger:
-                logger.log_file_process(synced_files, deleted_files, dest_path)
-
             if not changes_made:
                 console.log(
                     f"\n{dest_path} is up to date; no changes were made.",
                 )
 
         except subprocess.CalledProcessError as e:
-            if logger:
-                logger.error(f"rsync failed for {source_dir}. Error: {e}")
-            else:
-                console.log(f"[bold red]rsync failed for {source_dir}. Error: {e}")
+            console.log(f"[bold red]rsync failed for {source_dir}. Error: {e}")
 
 
 def process_rsync_output(line, dest_path, logger):

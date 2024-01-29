@@ -74,7 +74,7 @@ class ArgParser:
     def handle_pull(self, args, logger):
         logger.start_session(args)
 
-        sync_files(args.source_dirs, args.destination, logger=logger)
+        sync_files(args.source_dirs, args.destination)
 
         logger.end_session()
         logger.save_log()
