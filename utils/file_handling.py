@@ -2,8 +2,7 @@ import os
 import shutil
 import subprocess
 from datetime import datetime
-from core.transcribe import Transcriber
-from utils.conversion import to_lrc
+from core.transcribe import Transcriber, to_lrc
 from rich.console import Console
 from rich.progress import Progress, TextColumn, BarColumn, SpinnerColumn
 
