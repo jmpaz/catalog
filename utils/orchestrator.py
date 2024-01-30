@@ -63,12 +63,24 @@ class Orchestrator:
                     "", total=total_files, file_count=f"0/{total_files}"
                 )
                 for index, audio_file in enumerate(audio_files_to_process, start=1):
-                    self.process_audio_file(audio_file, progress, transcription_task_id)
+                    new_base_name = self.process_audio_file(
+                        audio_file, progress, transcription_task_id
+                    )
                     progress.update(
                         transcription_task_id,
                         advance=1,
                         file_count=f"{index}/{total_files}",
                     )
+
+                    audio_lrc_pair = (
+                        audio_file,
+                        os.path.join(
+                            self.tmp_dir, "transcriptions", f"{new_base_name}.lrc"
+                        ),
+                    )
+                    export_markdown(
+                        [audio_lrc_pair], self.tmp_dir, "data/template.md"
+                    )  # Export markdown right after processing a file
             self.console.print("Transcription complete.\n", style="green bold")
 
             self.export()
@@ -81,19 +93,16 @@ class Orchestrator:
                 f"Audio file already processed, skipping: {audio_file}", style="yellow"
             )
             progress.update(task_id, advance=1)  # Skip but advance the progress
-            return
+            return None
 
         start_time = datetime.now()
         print(f"Transcribing {audio_file}...")
 
         # Extract date and label from the audio file path
         date_str, label = self.extract_date_label(audio_file)
-        base_name = os.path.basename(audio_file)
-        file_ext = os.path.splitext(base_name)[1]
+        base_name = os.path.splitext(os.path.basename(audio_file))[0]
         new_base_name = (
-            f"{label} ({date_str}){file_ext}"
-            if label
-            else f"{os.path.splitext(base_name)[0]} ({date_str}){file_ext}"
+            f"{label} ({date_str})" if label else f"{base_name} ({date_str})"
         )
 
         # Ensure the audio file has not already been processed
@@ -103,25 +112,13 @@ class Orchestrator:
                 f"Audio file already processed, skipping: {audio_file}", style="yellow"
             )
             progress.update(task_id, advance=1)
-            return
+            return None
 
         # Transcribe and convert to LRC
         output_dir = os.path.join(self.tmp_dir, "transcriptions")
         os.makedirs(output_dir, exist_ok=True)
         self.transcriber.call_whisperx(audio_file, output_dir)
-        to_lrc(output_dir, output_dir)
-
-        # Find the generated LRC file
-        lrc_filename = next(
-            (f for f in os.listdir(output_dir) if f.endswith(".lrc")), None
-        )
-        if not lrc_filename:
-            self.console.log(f"No LRC file generated for: {audio_file}")
-            return
-
-        lrc_file_path = os.path.join(output_dir, lrc_filename)
-        audio_lrc_pair = (audio_file, lrc_file_path)
-        export_markdown([audio_lrc_pair], self.tmp_dir, "data/template.md")
+        to_lrc(output_dir, output_dir, date_str, label)
 
         end_time = datetime.now()
         duration = format_duration(end_time - start_time)
@@ -129,6 +126,9 @@ class Orchestrator:
 
         # Track the processed audio file
         self.processed_audio_files.append((audio_file, new_base_name))
+
+        # Return new_base_name so it can be used for immediate export
+        return new_base_name
 
     def export(self):
         self.console.log("Starting export...", style="bold")

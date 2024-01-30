@@ -79,9 +79,16 @@ def convert_srt_to_lrc(srt_file_path, lrc_file_path):
     os.remove(srt_file_path)
 
 
-def to_lrc(input_dir, output_dir):
+def to_lrc(input_dir, output_dir, date_str=None, label=None):
     for srt_file in os.listdir(input_dir):
         if srt_file.endswith(".srt"):
+            base_name = os.path.splitext(srt_file)[0]
+            file_ext = ".lrc"
+            new_base_name = (
+                f"{label} ({date_str}){file_ext}"
+                if label
+                else f"{base_name} ({date_str}){file_ext}"
+            )
             srt_path = os.path.join(input_dir, srt_file)
-            lrc_path = os.path.join(output_dir, os.path.splitext(srt_file)[0] + ".lrc")
+            lrc_path = os.path.join(output_dir, new_base_name)
             convert_srt_to_lrc(srt_path, lrc_path)
