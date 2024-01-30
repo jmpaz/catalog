@@ -18,22 +18,28 @@ def export_markdown(audio_lrc_pairs, target_path, template_path):
     for audio_path, lrc_path in audio_lrc_pairs:
         try:
             created_str, label = parse_file_details(audio_path)
+            if created_str is None or label is None:
+                raise ValueError(f"Could not parse file details for: {audio_path}")
+
             lrc_content = extract_lrc_content(lrc_path)
+            file_extension = os.path.splitext(audio_path)[1]  # Extract file extension
+
+            # Format strings for the backlink to insert + the output markdown filename
+            backlink_str = f"{label if label else os.path.splitext(os.path.basename(audio_path))[0]} ({created_str[:10]}){file_extension}"
+            markdown_str = f"{label if label else os.path.splitext(os.path.basename(audio_path))[0]}.md"
+
             markdown_content = prepare_markdown(
                 template_path,
                 lrc_content,
-                os.path.basename(audio_path),
+                backlink_str,
                 created_str,
             )
 
-            # Use label if available, otherwise use the audio file name for markdown file name
-            markdown_file_name = f"{label if label else os.path.splitext(os.path.basename(audio_path))[0]}.md"
-            markdown_file_path = os.path.join(target_path, markdown_file_name)
-
+            markdown_file_path = os.path.join(target_path, markdown_str)
             with open(markdown_file_path, "w") as markdown_file:
                 markdown_file.write(markdown_content)
 
-        except FileNotFoundError as e:
+        except (FileNotFoundError, ValueError) as e:
             print(f"Error: {e}")
 
 
@@ -54,7 +60,7 @@ def parse_file_details(audio_path):
         return None, None  # Return None if format doesn't match
 
     time_str, label = match.groups()
-    label = label.strip()  # Removing extra whitespaces
+    label = label.strip()
 
     # Formatting date and time
     date_str = datetime.strptime(parent_dir, "%Y-%m-%d").strftime("%Y-%m-%dT")
@@ -66,14 +72,14 @@ def parse_file_details(audio_path):
     )
 
 
-def prepare_markdown(template_src, lrc_str, filename_str, created_str=None):
+def prepare_markdown(template_src, lrc_str, backlink_str, created_str=None):
     """
     Injects LRC content into a markdown template, updates the 'created' frontmatter if provided,
     and ensures no 'null' values in the YAML frontmatter.
 
     :param template_src: Path to the markdown template with 'LRC_DEST' and '[[FILE_NAME.ext]]' placeholders.
     :param lrc_str: LRC file content.
-    :param filename_str: Name of the reference file.
+    :param backlink_str: Name of the file reference to be inserted.
     :param created_str: (Optional) Creation datetime string in 'YYYY-MM-DDTHH:MM:00' format to be injected into the frontmatter.
 
     :return: Processed markdown content as a string.
@@ -83,7 +89,7 @@ def prepare_markdown(template_src, lrc_str, filename_str, created_str=None):
 
     template = open(template_src, "r").read()
     markdown_content = template.replace(
-        "[[FILE_NAME.ext]]", f"[[{filename_str}]]"
+        "[[FILE_NAME.ext]]", f"[[{backlink_str}]]"
     ).replace("LRC_DEST", lrc_str)
 
     # Find frontmatter block
