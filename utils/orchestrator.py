@@ -127,7 +127,6 @@ class Orchestrator:
         # Track the processed audio file
         self.processed_audio_files.append((audio_file, new_base_name))
 
-        # Return new_base_name so it can be used for immediate export
         return new_base_name
 
     def export(self):
@@ -135,9 +134,9 @@ class Orchestrator:
         total_files = len(self.processed_audio_files)
         if total_files > 0:
             # Copy audio files to their destination
-            for audio_file, new_base_name in self.processed_audio_files:
+            for audio_file, base_name in self.processed_audio_files:
                 file_extension = os.path.splitext(audio_file)[1]
-                final_name = f"{new_base_name}{file_extension}"
+                final_name = f"{base_name}{file_extension}"
                 shutil.copy(
                     audio_file, os.path.join(self.final_audio_output_dir, final_name)
                 )
