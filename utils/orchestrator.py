@@ -1,7 +1,11 @@
 import os
+from datetime import datetime
 import shutil
 from core.transcribe import Transcriber, to_lrc
+from utils.file_handling import format_duration
 from utils.export import export_markdown, parse_file_details
+from rich.console import Console
+from rich.progress import Progress, BarColumn, TextColumn, SpinnerColumn
 
 
 class Orchestrator:
@@ -18,6 +22,7 @@ class Orchestrator:
         self.final_md_output_dir = final_md_output_dir
         self.tmp_dir = tmp_dir
         self.valid_formats = ("flac", "m4a", "mp3", "mp4", "ogg", "wav", "webm")
+        self.console = Console()
 
         # Initialize the Transcriber with parameters to be passed to whisperx
         self.transcriber = Transcriber(
@@ -35,23 +40,52 @@ class Orchestrator:
         os.makedirs(self.tmp_dir, exist_ok=True)
 
     def orchestrate(self):
-        audio_files = self.find_audio_files(self.audio_input_path, self.valid_formats)
+        all_audio_files = self.find_audio_files(
+            self.audio_input_path, self.valid_formats
+        )
+        audio_files_to_process = [
+            f for f in all_audio_files if not self.is_processed(f)
+        ]
+        audio_files_to_process.sort()
 
-        for audio_file in audio_files:
-            self.process_audio_file(audio_file)
+        total_files = len(audio_files_to_process)
+        self.console.print(f"Found {total_files} audio files to process.\n")
+        self.console.log("Starting transcription...", style="bold")
+        if total_files > 0:
+            with Progress(
+                "[progress.description]{task.description}",
+                BarColumn(bar_width=40),
+                TextColumn("[bold]{task.fields[file_count]}", justify="right"),
+                SpinnerColumn(spinner_name="dots", style="bold green"),
+                console=self.console,
+            ) as progress:
+                transcription_task_id = progress.add_task(
+                    "", total=total_files, file_count=f"0/{total_files}"
+                )
+                for index, audio_file in enumerate(audio_files_to_process, start=1):
+                    self.process_audio_file(audio_file, progress, transcription_task_id)
+                    progress.update(
+                        transcription_task_id,
+                        advance=1,
+                        file_count=f"{index}/{total_files}",
+                    )
+            self.console.print("Transcription complete.\n", style="green bold")
 
-        self.export()
+            self.export()
+        else:
+            self.console.print("No new files to process.", style="bold yellow")
 
-    def find_audio_files(self, path, valid_formats):
-        audio_files = []
-        for root, _, files in os.walk(path):
-            for file in files:
-                if file.endswith(valid_formats):
-                    audio_files.append(os.path.join(root, file))
-        print(f"Found {len(audio_files)} audio files.")
-        return audio_files
+    def process_audio_file(self, audio_file, progress, task_id):
+        if self.is_processed(audio_file):
+            self.console.log(
+                f"Audio file already processed, skipping: {audio_file}", style="yellow"
+            )
+            progress.update(task_id, advance=1)  # Skip but advance the progress
+            return
 
-    def process_audio_file(self, audio_file):
+        start_time = datetime.now()
+        print(f"Transcribing {audio_file}...")
+
         # Extract date and label from the audio file path
         date_str, label = self.extract_date_label(audio_file)
         base_name = os.path.basename(audio_file)
@@ -65,7 +99,10 @@ class Orchestrator:
         # Ensure the audio file has not already been processed
         final_audio_path = os.path.join(self.final_audio_output_dir, new_base_name)
         if os.path.exists(final_audio_path):
-            print(f"Audio file already processed, skipping: {audio_file}")
+            self.console.log(
+                f"Audio file already processed, skipping: {audio_file}", style="yellow"
+            )
+            progress.update(task_id, advance=1)
             return
 
         # Transcribe and convert to LRC
@@ -79,33 +116,49 @@ class Orchestrator:
             (f for f in os.listdir(output_dir) if f.endswith(".lrc")), None
         )
         if not lrc_filename:
-            print(f"No LRC file generated for: {audio_file}")
+            self.console.log(f"No LRC file generated for: {audio_file}")
             return
 
         lrc_file_path = os.path.join(output_dir, lrc_filename)
         audio_lrc_pair = (audio_file, lrc_file_path)
         export_markdown([audio_lrc_pair], self.tmp_dir, "data/template.md")
 
+        end_time = datetime.now()
+        duration = format_duration(end_time - start_time)
+        print(f"Finished processing {audio_file} in {duration}\n")
+
         # Track the processed audio file
         self.processed_audio_files.append((audio_file, new_base_name))
 
     def export(self):
-        # Copy audio files to their destination with the new naming convention
-        for audio_file, new_base_name in self.processed_audio_files:
-            shutil.copy(
-                audio_file, os.path.join(self.final_audio_output_dir, new_base_name)
+        self.console.log("Starting export...", style="bold")
+        total_files = len(self.processed_audio_files)
+        if total_files > 0:
+            # Copy audio files to their destination
+            for audio_file, new_base_name in self.processed_audio_files:
+                shutil.copy(
+                    audio_file, os.path.join(self.final_audio_output_dir, new_base_name)
+                )
+                print(f"Copied audio: {new_base_name}")
+
+            # Copy markdown files to their destination with unique names
+            for item in os.listdir(self.tmp_dir):
+                src_path = os.path.join(self.tmp_dir, item)
+                if item.endswith(".md"):
+                    dest_path = os.path.join(self.final_md_output_dir, item)
+                    dest_path = self.get_unique_filename(dest_path)
+                    shutil.copy(src_path, dest_path)
+            print(f"Exported markdown files to {self.final_md_output_dir}")
+
+            self.console.print(
+                f"\nFinished exporting {total_files} audio/markdown pairs.",
+                style="green bold",
             )
 
-        # Copy markdown files to their destination with unique names
-        for item in os.listdir(self.tmp_dir):
-            src_path = os.path.join(self.tmp_dir, item)
-            if item.endswith(".md"):
-                dest_path = os.path.join(self.final_md_output_dir, item)
-                dest_path = self.get_unique_filename(dest_path)
-                shutil.copy(src_path, dest_path)
-
-        # Clean up the temporary directory
-        shutil.rmtree(self.tmp_dir)
+            # Clean up the temporary directory
+            shutil.rmtree(self.tmp_dir)
+        else:
+            self.console.print("No files to export.", style="bold yellow")
 
     def get_unique_filename(self, path):
         # Ensure markdown files are not overwritten
@@ -121,3 +174,24 @@ class Orchestrator:
         date_str = os.path.basename(os.path.dirname(audio_file))
         _, label = parse_file_details(audio_file)
         return date_str, label
+
+    def find_audio_files(self, path, valid_formats):
+        audio_files = []
+        for root, _, files in os.walk(path):
+            for file in files:
+                if file.endswith(valid_formats):
+                    audio_files.append(os.path.join(root, file))
+        return audio_files
+
+    def is_processed(self, audio_file):
+        # Extract date and label from the audio file path
+        date_str, label = self.extract_date_label(audio_file)
+        base_name = os.path.basename(audio_file)
+        file_ext = os.path.splitext(base_name)[1]
+        new_base_name = (
+            f"{label} ({date_str}){file_ext}"
+            if label
+            else f"{os.path.splitext(base_name)[0]} ({date_str}){file_ext}"
+        )
+        final_audio_path = os.path.join(self.final_audio_output_dir, new_base_name)
+        return os.path.exists(final_audio_path)
