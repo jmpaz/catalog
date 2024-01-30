@@ -136,10 +136,12 @@ class Orchestrator:
         if total_files > 0:
             # Copy audio files to their destination
             for audio_file, new_base_name in self.processed_audio_files:
+                file_extension = os.path.splitext(audio_file)[1]
+                final_name = f"{new_base_name}{file_extension}"
                 shutil.copy(
-                    audio_file, os.path.join(self.final_audio_output_dir, new_base_name)
+                    audio_file, os.path.join(self.final_audio_output_dir, final_name)
                 )
-                print(f"Copied audio: {new_base_name}")
+                print(f"Copied audio: {final_name}")
 
             # Copy markdown files to their destination with unique names
             for item in os.listdir(self.tmp_dir):
