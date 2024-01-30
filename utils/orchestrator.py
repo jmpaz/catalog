@@ -10,6 +10,7 @@ class Orchestrator:
         audio_input_path,
         final_audio_output_dir,
         final_md_output_dir,
+        transcription_params: dict,
         tmp_dir=".tmp",
     ):
         self.audio_input_path = audio_input_path
@@ -17,7 +18,14 @@ class Orchestrator:
         self.final_md_output_dir = final_md_output_dir
         self.tmp_dir = tmp_dir
         self.valid_formats = ("flac", "m4a", "mp3", "mp4", "ogg", "wav", "webm")
-        self.transcriber = Transcriber()
+
+        # Initialize the Transcriber with parameters to be passed to whisperx
+        self.transcriber = Transcriber(
+            model=transcription_params.get("model", "large-v2"),
+            language=transcription_params.get("language", "en"),
+            device_index=transcription_params.get("device_index"),
+        )
+
         self.processed_audio_files = []
         self.ensure_directories()
 
