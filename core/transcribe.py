@@ -4,10 +4,11 @@ import os
 
 
 class Transcriber:
-    def __init__(self, model="large-v2", language="en", device_index=None):
+    def __init__(self, model="large-v2", language="en", device_index=None, prompt=None):
         self.model = model
         self.language = language
         self.device_index = device_index
+        self.prompt = prompt
 
     def call_whisperx(
         self,
@@ -23,7 +24,7 @@ class Transcriber:
             input_path,
             "--model",
             self.model,
-            "--output_format",
+            "--output_format" "",
             output_format,
             "--output_dir",
             output_dir,
@@ -39,8 +40,8 @@ class Transcriber:
                 str(speaker_count),
             ]
 
-        if initial_prompt:
-            cmd += ["--initial_prompt", initial_prompt]
+        if initial_prompt or self.prompt:
+            cmd += ["--initial_prompt", initial_prompt or self.prompt]
 
         if self.device_index is not None:
             cmd += ["--device_index", str(self.device_index)]

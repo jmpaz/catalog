@@ -27,8 +27,8 @@ class Orchestrator:
         # Initialize the Transcriber with parameters to be passed to whisperx
         self.transcriber = Transcriber(
             model=transcription_params.get("model", "large-v2"),
-            language=transcription_params.get("language", "en"),
             device_index=transcription_params.get("device_index"),
+            prompt=transcription_params.get("prompt"),
         )
 
         self.processed_audio_files = []
