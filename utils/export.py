@@ -34,6 +34,7 @@ def export_markdown(audio_lrc_pairs, target_path, template_path):
                 lrc_content,
                 base_filename + file_extension,
                 created_str,
+                base_filename,
             )
 
             markdown_file_path = os.path.join(target_path, markdown_str)
@@ -73,7 +74,9 @@ def parse_file_details(audio_path):
     )
 
 
-def prepare_markdown(template_src, lrc_str, backlink_str, created_str=None):
+def prepare_markdown(
+    template_src, lrc_str, backlink_str, created_str=None, initial_filename=None
+):
     """
     Injects LRC content into a markdown template, updates the 'created' frontmatter if provided,
     and ensures no 'null' values in the YAML frontmatter.
@@ -82,6 +85,7 @@ def prepare_markdown(template_src, lrc_str, backlink_str, created_str=None):
     :param lrc_str: LRC file content.
     :param backlink_str: Name of the file reference to be inserted.
     :param created_str: (Optional) Creation datetime string in 'YYYY-MM-DDTHH:MM:00' format to be injected into the frontmatter.
+    :param initial_filename: (Optional) If provided, will be inserted into the frontmatter as 'source_filename'.
 
     :return: Processed markdown content as a string.
     """
@@ -104,6 +108,9 @@ def prepare_markdown(template_src, lrc_str, backlink_str, created_str=None):
         # Inject or update 'created' property if needed
         if created_str:
             frontmatter["created"] = created_str
+
+        # Insert 'source_filename' at the beginning of the frontmatter dictionary
+        frontmatter = {"source_filename": initial_filename, **frontmatter}
 
         # Dump the updated frontmatter back to string ensuring no null values
         frontmatter_str_updated = yaml.dump(
