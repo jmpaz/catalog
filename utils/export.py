@@ -24,14 +24,15 @@ def export_markdown(audio_lrc_pairs, target_path, template_path):
             lrc_content = extract_lrc_content(lrc_path)
             file_extension = os.path.splitext(audio_path)[1]  # Extract file extension
 
-            # Format strings for the backlink to insert + the output markdown filename
-            backlink_str = f"{label if label else os.path.splitext(os.path.basename(audio_path))[0]} ({created_str[:10]}){file_extension}"
-            markdown_str = f"{label if label else os.path.splitext(os.path.basename(audio_path))[0]}.md"
+            # Format strings for the markdown file name and backlink
+            base_filename = f"{label if label else os.path.splitext(os.path.basename(audio_path))[0]} ({created_str[:10]})"
+            markdown_str = f"{base_filename}.md"
 
+            # Prepare the markdown content
             markdown_content = prepare_markdown(
                 template_path,
                 lrc_content,
-                backlink_str,
+                base_filename + file_extension,
                 created_str,
             )
 
