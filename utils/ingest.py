@@ -12,11 +12,14 @@ from datetime import datetime, timedelta
 class PixelExtractor:
     """
     Retrieves the start time for audio files created by Pixel Recorder using `creation_time` (UTC) and `duration` values from file metadata.
+    Pixel Recorder does not store the start time in the file metadata, so this script estimates the start time by subtracting the duration from the creation time.
+    If the user paused and resumed the recording, the estimated time will be inaccurate.
 
 
     Attributes:
         file_paths (list): A list of file paths for the audio files to process.
-        default_utc_offset (int): An optional UTC offset (default is -5). This is used when a filename time is not available.
+        location (str): Used for DST calculations. Defaults to 'America/New_York'.
+        utc_offset (int): The UTC offset for the location. Defaults to -5 for 'America/New_York'.
 
     Methods:
         process_files(location): Processes the list of audio files, extracting or estimating timestamps.
@@ -31,16 +34,17 @@ class PixelExtractor:
         ])
 
         # Process the files with a specified location for DST adjustment
-        results = extractor.process_files('America/New_York')
+        results = extractor.process_files()
 
         # results will be a list of tuples containing estimated dates and times:
-        # [('file1', 'YYYY-MM-DD', 'HH-MM'), ('file2', 'YYYY-MM-DD', 'HH-MM'), ...]
+        # [('file1', 'YYYY-MM-DD', 'HH-MM-SS'), ('file2', 'YYYY-MM-DD', 'HH-MM-SS'), ...]
 
     """
 
-    def __init__(self, file_paths, default_utc_offset=-5):
+    def __init__(self, file_paths, location="America/New_York", utc_offset=-5):
         self.file_paths = file_paths
-        self.default_utc_offset = default_utc_offset
+        self.location = location
+        self.utc_offset = utc_offset
 
     def extract_time_from_filename(self, filename):
         time_pattern = r"(\d{1,2})[ _-](\d{1,2}) ?(AM|PM)|(\d{1,2})_(\d{1,2})(am|pm)"
@@ -54,7 +58,7 @@ class PixelExtractor:
             return f"{int(hours):02d}:{int(minutes):02d} {am_pm}"
         return None
 
-    def timestamp_estimate(self, creation_time, duration_sec):
+    def estimate(self, creation_time, duration_sec):
         creation_datetime = datetime.strptime(creation_time, "%Y-%m-%dT%H:%M:%S.%fZ")
         estimated_start_time = creation_datetime - timedelta(seconds=duration_sec)
         return estimated_start_time
@@ -71,10 +75,13 @@ class PixelExtractor:
         # Return DST status
         return creation_datetime_local.dst() != timedelta(0)
 
-    def guess_timezone(self, file_time_str, creation_time, duration_sec, location):
+    def derive_timestamp(self, file_time_str, creation_time, duration_sec, location):
+        is_estimate = (
+            True
+        )  # Unless a time is extracted from the filename, the time will be an estimate
         is_dst = self.get_dst_status(creation_time, location)
-        estimated_start_time = self.timestamp_estimate(creation_time, duration_sec)
-        timezone_offset = self.default_utc_offset + (1 if is_dst else 0)
+        estimated_start_time = self.estimate(creation_time, duration_sec)
+        timezone_offset = self.utc_offset + (1 if is_dst else 0)
 
         if file_time_str:
             file_time_full_str = f"{estimated_start_time.date()} {file_time_str}"
@@ -84,28 +91,34 @@ class PixelExtractor:
             time_difference = filename_datetime - estimated_start_time
             time_difference_in_hours = time_difference / timedelta(hours=1)
             timezone_offset = round(time_difference_in_hours)
+            is_estimate = False
 
         adjusted_time = estimated_start_time + timedelta(hours=timezone_offset)
-        return adjusted_time.date(), adjusted_time.strftime("%H-%M")
+        return adjusted_time.date(), adjusted_time.strftime("%H-%M-%S"), is_estimate
 
-    def process_files(self, location):
+    def process_files(self):
+        location = self.location
         results = []
         for file_path in self.file_paths:
             filename = Path(file_path).stem
             creation_time, duration = self.get_metadata(file_path)
             file_time_str = self.extract_time_from_filename(filename)
-            date_str, time_str = self.guess_timezone(
+            date_str, time_str, is_estimate = self.derive_timestamp(
                 file_time_str, creation_time, duration, location
             )
             results.append((filename, date_str, time_str))
+            if is_estimate:
+                print(
+                    f"{date_str} {time_str} (UTC{self.utc_offset:+d}) estimated for {file_path}"
+                )
         return results
 
     def get_metadata(self, file_path):
-        # Expand the '~' to the user's home directory
-        file_path = os.path.expanduser(file_path)
+        file_path = (
+            os.path.expanduser(file_path) if file_path.startswith("~") else file_path
+        )
 
         try:
-            # Running the ffprobe command
             result = subprocess.run(
                 [
                     "ffprobe",
