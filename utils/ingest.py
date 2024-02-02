@@ -3,48 +3,91 @@ import sys
 import re
 import json
 import subprocess
-
 from pathlib import Path
-from pytz import timezone
 from datetime import datetime, timedelta
+from pytz import timezone
 
 
-class PixelExtractor:
+class FileExtractor:
     """
-    Retrieves the start time for audio files created by Pixel Recorder using `creation_time` (UTC) and `duration` values from file metadata.
-    Pixel Recorder does not store the start time in the file metadata, so this script estimates the start time by subtracting the duration from the creation time.
-    If the user paused and resumed the recording, the estimated time will be inaccurate.
-
+    Base class for file extractors.
 
     Attributes:
-        file_paths (list): A list of file paths for the audio files to process.
+        source_dir (str): Directory containing audio files to process.
+        target_dir (str): Directory where processed files will be stored.
+
+    Usage:
+        # Initialize the extractor with source and target directories
+        extractor = Extractor('/path/to/source', '/path/to/target')
+
+        # Process files
+        extractor.process_directory()
+    """
+
+    def __init__(self, source_dir, target_dir):
+        self.source_dir = source_dir
+        self.target_dir = target_dir
+
+    def process_directory(self):
+        """
+        Processes all files in the source directory.
+        Subclasses should implement specific processing logic.
+        """
+        raise NotImplementedError("Must be implemented in subclasses.")
+
+    def move_file(self, file_path, new_path):
+        os.makedirs(os.path.dirname(new_path), exist_ok=True)
+        os.rename(file_path, new_path)
+
+
+class PixelExtractor(FileExtractor):
+    """
+    Extractor subclass for handling audio files created by Google Pixel phones' Recorder app.
+
+    Pulls audio files from a source directory and processes them, deriving a start time based on
+    `creation_time` (UTC) and `duration` values from file metadata before moving them to a target directory.
+
+    Inherited Attributes:
+        source_dir (str): Directory containing audio files to process.
+        target_dir (str): Directory where processed files will be stored.
+
+    Additional Attributes:
         location (str): Used for DST calculations. Defaults to 'America/New_York'.
         utc_offset (int): The UTC offset for the location. Defaults to -5 for 'America/New_York'.
 
-    Methods:
-        process_files(location): Processes the list of audio files, extracting or estimating timestamps.
-            - location (str): A string representing the location (e.g., 'America/New_York') used for DST calculations.
-
     Usage:
-        # Initialize the extractor with a list of file paths
-        extractor = PixelExtractor([
-            "/path/to/file1.m4a",
-            "/path/to/file2.m4a",
-            ...
-        ])
+        # Initialize the extractor with source and target directories
+        extractor = PixelExtractor('/path/to/source', '/path/to/target')
 
-        # Process the files with a specified location for DST adjustment
-        results = extractor.process_files()
-
-        # results will be a list of tuples containing estimated dates and times:
-        # [('file1', 'YYYY-MM-DD', 'HH-MM-SS'), ('file2', 'YYYY-MM-DD', 'HH-MM-SS'), ...]
-
+        # Process files
+        extractor.process_directory()
     """
 
-    def __init__(self, file_paths, location="America/New_York", utc_offset=-5):
-        self.file_paths = file_paths
+    def __init__(
+        self, source_dir, target_dir, location="America/New_York", utc_offset=-5
+    ):
+        super().__init__(source_dir, target_dir)
         self.location = location
         self.utc_offset = utc_offset
+
+    def process_directory(self):
+        file_paths = [
+            os.path.join(self.source_dir, filename)
+            for filename in os.listdir(self.source_dir)
+        ]
+        results = self.process_files(file_paths)
+        for filename, date_obj, time_str in results:
+            date_str = date_obj.strftime("%Y-%m-%d")
+            year_month = date_str[
+                :7
+            ]  # Extract YYYY-MM part for the directory structure
+            source_file = os.path.join(self.source_dir, filename)
+
+            # Construct the target path without adding extra zeroes
+            target_path = os.path.join(
+                self.target_dir, year_month, date_str, f"{time_str}.m4a"
+            )
+            self.move_file(source_file, target_path)
 
     def extract_time_from_filename(self, filename):
         time_pattern = r"(\d{1,2})[ _-](\d{1,2}) ?(AM|PM)|(\d{1,2})_(\d{1,2})(am|pm)"
@@ -77,12 +120,13 @@ class PixelExtractor:
 
     def derive_timestamp(self, file_time_str, creation_time, duration_sec, location):
         is_estimate = (
-            True
-        )  # Unless a time is extracted from the filename, the time will be an estimate
+            not file_time_str
+        )  # Estimate only if no time extracted from filename
         is_dst = self.get_dst_status(creation_time, location)
         estimated_start_time = self.estimate(creation_time, duration_sec)
         timezone_offset = self.utc_offset + (1 if is_dst else 0)
 
+        # If a time is extracted from the filename, use it
         if file_time_str:
             file_time_full_str = f"{estimated_start_time.date()} {file_time_str}"
             filename_datetime = datetime.strptime(
@@ -91,26 +135,30 @@ class PixelExtractor:
             time_difference = filename_datetime - estimated_start_time
             time_difference_in_hours = time_difference / timedelta(hours=1)
             timezone_offset = round(time_difference_in_hours)
-            is_estimate = False
+            adjusted_time = filename_datetime
+        else:
+            adjusted_time = estimated_start_time + timedelta(hours=timezone_offset)
 
-        adjusted_time = estimated_start_time + timedelta(hours=timezone_offset)
         return adjusted_time.date(), adjusted_time.strftime("%H-%M-%S"), is_estimate
 
-    def process_files(self):
+    def process_files(self, file_paths):
         location = self.location
         results = []
-        for file_path in self.file_paths:
-            filename = Path(file_path).stem
+        for file_path in file_paths:
+            filename = Path(file_path).name
             creation_time, duration = self.get_metadata(file_path)
-            file_time_str = self.extract_time_from_filename(filename)
-            date_str, time_str, is_estimate = self.derive_timestamp(
-                file_time_str, creation_time, duration, location
-            )
-            results.append((filename, date_str, time_str))
-            if is_estimate:
-                print(
-                    f"{date_str} {time_str} (UTC{self.utc_offset:+d}) estimated for {file_path}"
+            if creation_time and duration:
+                file_time_str = self.extract_time_from_filename(filename)
+                date_str, time_str, is_estimate = self.derive_timestamp(
+                    file_time_str, creation_time, duration, location
                 )
+                results.append((filename, date_str, time_str))
+                if is_estimate:
+                    print(
+                        f"{date_str} {time_str} (UTC{self.utc_offset:+d}) estimated for {file_path}"
+                    )
+                else:
+                    print(f"Copied {file_path} to {date_str}/{time_str}.m4a")
         return results
 
     def get_metadata(self, file_path):
@@ -132,11 +180,6 @@ class PixelExtractor:
                 capture_output=True,
                 text=True,
             )
-
-            # Log the ffprobe output for debugging
-            # print("ffprobe output:", result.stdout, file=sys.stderr)
-            # print("ffprobe errors:", result.stderr, file=sys.stderr)
-
             metadata = json.loads(result.stdout)
 
             # Extract creation_time and duration from the metadata
