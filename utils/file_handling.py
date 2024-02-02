@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import subprocess
 from datetime import datetime
@@ -97,6 +98,28 @@ def format_duration(duration):
         duration_parts.append(f"{seconds}s")
 
     return " ".join(duration_parts)
+
+
+def extract_label(filename):
+    filename = os.path.splitext(filename)[0]  # Remove the file extension
+    time_pattern = r"\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+at\s+\d{1,2}(?:[-_]\d{1,2})?\s*(?:AM|PM|am|pm)?\b"
+    label = re.sub(time_pattern, "", filename, flags=re.IGNORECASE).strip()
+
+    # Remove leading/trailing separators
+    separators = ["--", "–", "—", "•", "|"]
+    separators_pattern = f"^[{''.join(map(re.escape, separators))}]+|[{''.join(map(re.escape, separators))}]+$"
+    label = re.sub(separators_pattern, "", label).strip()
+
+    # Remove leading/trailing whitespace and underscores
+    label = label.strip("_ ")
+
+    # Replace unsafe characters
+    unsafe_chars = ["#", "^", "|", ":", "?", "*", '"', "<", ">"]
+    for char in unsafe_chars:
+        label = label.replace(char, "_")
+    label = label.replace("[", "(").replace("]", ")")
+
+    return label
 
 
 class AudioHandler:
