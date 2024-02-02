@@ -70,6 +70,29 @@ class PixelExtractor(FileExtractor):
         self.location = location
         self.utc_offset = utc_offset
 
+    def move_file(self, file_path, new_path, original_filename):
+        os.makedirs(os.path.dirname(new_path), exist_ok=True)
+
+        # Store the original filename under the 'title' metadata field
+        command = [
+            "ffmpeg",
+            "-i",
+            file_path,
+            "-metadata",
+            f"title={original_filename}",
+            "-codec",
+            "copy",  # copy the codec settings to avoid re-encoding
+            new_path,
+        ]
+
+        try:
+            subprocess.run(command, check=True)
+            print(f"Processed {file_path} and metadata added.")
+        except subprocess.CalledProcessError as e:
+            print(
+                f"An error occurred while processing {file_path}: {e}", file=sys.stderr
+            )
+
     def process_directory(self):
         file_paths = [
             os.path.join(self.source_dir, filename)
@@ -87,7 +110,7 @@ class PixelExtractor(FileExtractor):
             target_path = os.path.join(
                 self.target_dir, year_month, date_str, f"{time_str}.m4a"
             )
-            self.move_file(source_file, target_path)
+            self.move_file(source_file, target_path, filename)
 
     def extract_time_from_filename(self, filename):
         time_pattern = r"(\d{1,2})[ _-](\d{1,2}) ?(AM|PM)|(\d{1,2})_(\d{1,2})(am|pm)"
@@ -158,7 +181,7 @@ class PixelExtractor(FileExtractor):
                         f"{date_str} {time_str} (UTC{self.utc_offset:+d}) estimated for {file_path}"
                     )
                 else:
-                    print(f"Copied {file_path} to {date_str}/{time_str}.m4a")
+                    print(f"Resolved {file_path} to {date_str}/{time_str}.m4a")
         return results
 
     def get_metadata(self, file_path):
