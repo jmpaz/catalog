@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from datetime import datetime, timedelta
 from pytz import timezone
+from utils.file_handling import extract_label
 
 
 class FileExtractor:
@@ -70,7 +71,7 @@ class PixelExtractor(FileExtractor):
         self.location = location
         self.utc_offset = utc_offset
 
-    def process_directory(self):
+    def process_directory(self, debug=False):
         file_paths = [
             os.path.join(self.source_dir, filename)
             for filename in os.listdir(self.source_dir)
@@ -78,18 +79,22 @@ class PixelExtractor(FileExtractor):
         results = self.process_files(file_paths)
         for filename, date_obj, time_str in results:
             date_str = date_obj.strftime("%Y-%m-%d")
-            year_month = date_str[
-                :7
-            ]  # Extract YYYY-MM part for the directory structure
+            year_month = date_str[:7]  # YYYY-MM
             source_file = os.path.join(self.source_dir, filename)
 
-            # Construct the target path without adding extra zeroes
-            target_path = os.path.join(
-                self.target_dir, year_month, date_str, f"{time_str}.m4a"
-            )
-            self.move_file(source_file, target_path)
+            label = extract_label(filename)
 
-    def extract_time_from_filename(self, filename):
+            # Construct the target path with the label
+            target_filename = f"{time_str} {label}.m4a" if label else f"{time_str}.m4a"
+            target_path = os.path.join(
+                self.target_dir, year_month, date_str, target_filename
+            )
+            if debug:
+                print(f"\n{filename}\n-> {year_month}/{target_filename}")
+            else:
+                self.move_file(source_file, target_path)
+
+    def extract_time(self, filename):
         time_pattern = r"(\d{1,2})[ _-](\d{1,2}) ?(AM|PM)|(\d{1,2})_(\d{1,2})(am|pm)"
         match = re.search(time_pattern, filename, re.IGNORECASE)
         if match:
@@ -148,7 +153,7 @@ class PixelExtractor(FileExtractor):
             filename = Path(file_path).name
             creation_time, duration = self.get_metadata(file_path)
             if creation_time and duration:
-                file_time_str = self.extract_time_from_filename(filename)
+                file_time_str = self.extract_time(filename)
                 date_str, time_str, is_estimate = self.derive_timestamp(
                     file_time_str, creation_time, duration, location
                 )
@@ -158,7 +163,7 @@ class PixelExtractor(FileExtractor):
                         f"{date_str} {time_str} (UTC{self.utc_offset:+d}) estimated for {file_path}"
                     )
                 else:
-                    print(f"Copied {file_path} to {date_str}/{time_str}.m4a")
+                    print(f"Resolved {file_path} to {date_str}/{time_str}")
         return results
 
     def get_metadata(self, file_path):
