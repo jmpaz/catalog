@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import re
 import json
@@ -71,7 +72,7 @@ class PixelExtractor(FileExtractor):
         self.location = location
         self.utc_offset = utc_offset
 
-    def process_directory(self, debug=False):
+    def process_directory(self, debug=False, mode="sync"):
         file_paths = [
             os.path.join(self.source_dir, filename)
             for filename in os.listdir(self.source_dir)
@@ -92,7 +93,15 @@ class PixelExtractor(FileExtractor):
             if debug:
                 print(f"\n{filename}\n-> {year_month}/{target_filename}")
             else:
-                self.move_file(source_file, target_path)
+                if mode == "sync":
+                    if not os.path.exists(target_path):
+                        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                        shutil.copy2(source_file, target_path)
+                        print(f"Copied: {source_file} to {target_path}")
+                    else:
+                        print(f"Skipped (already exists): {target_path}")
+                elif mode == "move":
+                    self.move_file(source_file, target_path)
 
     def extract_time(self, filename):
         time_pattern = r"(\d{1,2})[ _-](\d{1,2}) ?(AM|PM)|(\d{1,2})_(\d{1,2})(am|pm)"
