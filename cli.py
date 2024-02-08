@@ -1,7 +1,7 @@
 import os
 import argparse
 from rich.console import Console
-from utils.orchestrator import Orchestrator
+from core.orchestrator import Orchestrator
 from utils.logging import Logger
 from utils.file_handling import AudioHandler, sync_files
 
