@@ -66,13 +66,20 @@ class PixelExtractor(FileExtractor):
     """
 
     def __init__(
-        self, source_dir, target_dir, location="America/New_York", utc_offset=-5
+        self,
+        source_dir,
+        target_dir,
+        mode="sync",
+        location="America/New_York",
+        utc_offset=-5,
     ):
         super().__init__(source_dir, target_dir)
+        self.mode = mode
         self.location = location
         self.utc_offset = utc_offset
 
-    def process_directory(self, debug=False, mode="sync"):
+    def process_directory(self, debug=False):
+        mode = self.mode
         file_paths = [
             os.path.join(self.source_dir, filename)
             for filename in os.listdir(self.source_dir)
@@ -167,12 +174,12 @@ class PixelExtractor(FileExtractor):
                     file_time_str, creation_time, duration, location
                 )
                 results.append((filename, date_str, time_str))
-                if is_estimate:
-                    print(
-                        f"{date_str} {time_str} (UTC{self.utc_offset:+d}) estimated for {file_path}"
-                    )
-                else:
-                    print(f"Resolved {file_path} to {date_str}/{time_str}")
+                # if is_estimate:
+                #     print(
+                #         f"{date_str} {time_str} (UTC{self.utc_offset:+d}) estimated for {file_path}"
+                #     )
+                # else:
+                #     print(f"Resolved {file_path} to {date_str}/{time_str}")
         return results
 
     def get_metadata(self, file_path):

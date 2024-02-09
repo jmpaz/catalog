@@ -4,6 +4,7 @@ from rich.console import Console
 from core.orchestrator import Orchestrator
 from utils.logging import Logger
 from utils.file_handling import AudioHandler, sync_files
+from utils.ingest import PixelExtractor
 
 
 class ArgParser:
@@ -87,6 +88,32 @@ class ArgParser:
             help="Destination directory for the files. Default is 'data/imports'.",
         )
         parser_pull.set_defaults(func=self.handle_pull)
+
+        parser_ingest = subparsers.add_parser(
+            "ingest", help="Ingest audio files for processing."
+        )
+        parser_ingest.add_argument(
+            "source_dir", help="Source directory containing audio files."
+        )
+        parser_ingest.add_argument(
+            "target_dir", help="Target directory for processed audio files."
+        )
+        parser_ingest.add_argument(
+            "--move", action="store_true", help="Move files instead of copying."
+        )
+        parser_ingest.set_defaults(func=self.handle_ingest)
+
+    def handle_ingest(self, args, logger):
+        logger.start_session(args)
+
+        # Initialize PixelExtractor with source and target directories
+        extractor = PixelExtractor(
+            args.source_dir, args.target_dir, mode="move" if args.move else "sync"
+        )
+        self.console.log("Starting ingest...\n")
+
+        logger.end_session()
+        logger.save_log()
 
     def handle_pull(self, args, logger):
         logger.start_session(args)
