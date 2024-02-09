@@ -74,7 +74,7 @@ class ArgParser:
         )
         parser_transcribe.set_defaults(func=self.handle_transcription)
 
-        # File import
+        # File synchronization (e.g. from Google Drive)
         parser_pull = subparsers.add_parser(
             "pull", help="Synchronize files/folders to a local directory."
         )
@@ -89,6 +89,7 @@ class ArgParser:
         )
         parser_pull.set_defaults(func=self.handle_pull)
 
+        # Ingest from supported sources
         parser_ingest = subparsers.add_parser(
             "ingest", help="Ingest audio files for processing."
         )
@@ -111,6 +112,14 @@ class ArgParser:
             args.source_dir, args.target_dir, mode="move" if args.move else "sync"
         )
         self.console.log("Starting ingest...\n")
+
+        summary = extractor.process_directory()  # Store ingest results
+        if summary["processed"] > 0:
+            self.console.log(f"Successfully processed {summary['processed']} files.")
+        if summary["skipped"] > 0:
+            self.console.log(f"Skipped {summary['skipped']} files.")
+        if summary["processed"] == 0 and summary["skipped"] == 0:
+            self.console.log("No files were extracted.", style="bold yellow")
 
         logger.end_session()
         logger.save_log()

@@ -80,6 +80,7 @@ class PixelExtractor(FileExtractor):
 
     def process_directory(self, debug=False):
         mode = self.mode
+        summary = {"processed": 0, "skipped": 0}
         file_paths = [
             os.path.join(self.source_dir, filename)
             for filename in os.listdir(self.source_dir)
@@ -105,10 +106,13 @@ class PixelExtractor(FileExtractor):
                         os.makedirs(os.path.dirname(target_path), exist_ok=True)
                         shutil.copy2(source_file, target_path)
                         print(f"Copied: {source_file} to {target_path}")
+                        summary["processed"] += 1
                     else:
                         print(f"Skipped (already exists): {target_path}")
+                        summary["skipped"] += 1
                 elif mode == "move":
                     self.move_file(source_file, target_path)
+        return summary
 
     def extract_time(self, filename):
         time_pattern = r"(\d{1,2})[ _-](\d{1,2}) ?(AM|PM)|(\d{1,2})_(\d{1,2})(am|pm)"
