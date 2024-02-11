@@ -29,6 +29,7 @@ class Orchestrator:
             model=transcription_params.get("model", "large-v2"),
             device_index=transcription_params.get("device_index"),
             prompt=transcription_params.get("prompt"),
+            language=transcription_params.get("language"),
         )
 
         self.processed_audio_files = []

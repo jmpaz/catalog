@@ -72,6 +72,11 @@ class ArgParser:
             default="srt",
             help="Output format (not used when exporting): 'srt', 'json', 'lrc'.",
         )
+        parser_transcribe.add_argument(
+            "--language",
+            type=str,
+            help="Language code (e.g. 'en', 'es') to use for transcription.",
+        )
         parser_transcribe.set_defaults(func=self.handle_transcription)
 
         # File synchronization (e.g. from Google Drive)
@@ -155,6 +160,7 @@ class ArgParser:
             "speaker_count": args.speaker_count,
             "device_index": args.device_index,
             "prompt": args.prompt,
+            "language": args.language,
         }
 
         orchestrator = Orchestrator(

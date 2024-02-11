@@ -4,7 +4,7 @@ import os
 
 
 class Transcriber:
-    def __init__(self, model="large-v2", language="en", device_index=None, prompt=None):
+    def __init__(self, model="large-v2", language=None, device_index=None, prompt=None):
         self.model = model
         self.language = language
         self.device_index = device_index
@@ -28,9 +28,10 @@ class Transcriber:
             output_format,
             "--output_dir",
             output_dir,
-            "--language",
-            self.language,
         ]
+
+        if self.language:
+            cmd += ["--language", self.language]
 
         if speaker_count:
             cmd += [
