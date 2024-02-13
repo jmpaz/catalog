@@ -42,9 +42,9 @@ class FileExtractor:
         os.rename(file_path, new_path)
 
 
-class PixelExtractor(FileExtractor):
+class PixelExtractor:
     """
-    Extractor subclass for handling audio files created by Google Pixel phones' Recorder app.
+    Extractor for handling audio files created by Google Pixel phones' Recorder app.
 
     Pulls audio files from a source directory and processes them, deriving a start time based on
     `creation_time` (UTC) and `duration` values from file metadata before moving them to a target directory.
@@ -73,23 +73,27 @@ class PixelExtractor(FileExtractor):
         location="America/New_York",
         utc_offset=-5,
     ):
-        super().__init__(source_dir, target_dir)
+        self.source_dir = source_dir
+        self.target_dir = target_dir
         self.mode = mode
         self.location = location
         self.utc_offset = utc_offset
 
+    def process_source(self):
+        self.process_directory(self.source_dir)
+
     def process_directory(self, debug=False):
+        source_dir = self.source_dir
         mode = self.mode
         summary = {"processed": 0, "skipped": 0}
         file_paths = [
-            os.path.join(self.source_dir, filename)
-            for filename in os.listdir(self.source_dir)
+            os.path.join(source_dir, filename) for filename in os.listdir(source_dir)
         ]
         results = self.process_files(file_paths)
         for filename, date_obj, time_str in results:
             date_str = date_obj.strftime("%Y-%m-%d")
             year_month = date_str[:7]  # YYYY-MM
-            source_file = os.path.join(self.source_dir, filename)
+            source_file = os.path.join(source_dir, filename)
 
             label = extract_label(filename)
 
@@ -113,6 +117,10 @@ class PixelExtractor(FileExtractor):
                 elif mode == "move":
                     self.move_file(source_file, target_path)
         return summary
+
+    def move_file(self, file_path, new_path):
+        os.makedirs(os.path.dirname(new_path), exist_ok=True)
+        os.rename(file_path, new_path)
 
     def extract_time(self, filename):
         time_pattern = r"(\d{1,2})[ _-](\d{1,2}) ?(AM|PM)|(\d{1,2})_(\d{1,2})(am|pm)"
