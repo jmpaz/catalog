@@ -3,6 +3,7 @@ import shutil
 import sys
 import re
 import json
+import tempfile
 import subprocess
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -10,36 +11,103 @@ from pytz import timezone
 from utils.file_handling import extract_label
 
 
-class FileExtractor:
+class iCloudExtractor:
     """
-    Base class for file extractors.
+    Extractor for retrieving audio files from iCloud Drive.
 
     Attributes:
-        source_dir (str): Directory containing audio files to process.
+        api (ICloudPyService): iCloud service instance for accessing files.
+        base_path (str): Path within iCloud Drive to start processing.
         target_dir (str): Directory where processed files will be stored.
-
-    Usage:
-        # Initialize the extractor with source and target directories
-        extractor = Extractor('/path/to/source', '/path/to/target')
-
-        # Process files
-        extractor.process_directory()
+        debug (bool): Enables debug mode for dry runs.
     """
 
-    def __init__(self, source_dir, target_dir):
-        self.source_dir = source_dir
+    def __init__(self, api, base_path, target_dir, debug=False):
+        self.api = api
+        self.base_path = base_path
         self.target_dir = target_dir
+        self.debug = debug
 
-    def process_directory(self):
-        """
-        Processes all files in the source directory.
-        Subclasses should implement specific processing logic.
-        """
-        raise NotImplementedError("Must be implemented in subclasses.")
+    def process_source(self):
+        self.process_directory(self.api.drive[self.base_path], self.base_path)
 
-    def move_file(self, file_path, new_path):
-        os.makedirs(os.path.dirname(new_path), exist_ok=True)
-        os.rename(file_path, new_path)
+    def process_directory(self, drive_node, base_path):
+        if hasattr(drive_node, "dir") and drive_node.size is None:
+            contents = drive_node.dir()
+            if contents is None:
+                print(f"Warning: No contents found in '{base_path}'.")
+                return
+            for item in contents:
+                item_node = drive_node[item]
+                new_base_path = os.path.join(base_path, item)
+                if item_node.size is None:
+                    self.process_directory(item_node, new_base_path)
+                else:
+                    self.process_item(item_node, new_base_path)
+        else:
+            self.process_item(drive_node, base_path)
+
+    def process_item(self, item_node, base_path):
+        filename = os.path.basename(base_path)
+        destination_path = self.construct_destination_path(base_path, filename)
+        # Check if the download and sync are necessary
+        if os.path.exists(destination_path):
+            print(f"Skipping {filename}, already up to date.")
+        else:
+            if self.debug:
+                print(
+                    f"DEBUG: Would download {filename} and sync to {destination_path}"
+                )
+            else:
+                self.download_and_sync(item_node, destination_path)
+
+    def construct_destination_path(self, base_path, filename):
+        # Extract date components from base_path if available
+        date_match = re.search(r"(\d{4})-(\d{2})-(\d{2})", base_path)
+        if date_match:
+            year, month, day = date_match.groups()
+            destination_dir = os.path.join(
+                self.target_dir, year, f"{year}-{month}", f"{year}-{month}-{day}"
+            )
+        else:
+            destination_dir = os.path.join(self.target_dir, "Undated")
+
+        if not os.path.exists(destination_dir):
+            os.makedirs(destination_dir)
+
+        return os.path.join(destination_dir, filename)
+
+    def download_and_sync(self, drive_node, destination_path):
+        if self.debug:
+            print(
+                f"DEBUG: Would download {drive_node.name} to temp file and sync to {destination_path}"
+            )
+        else:
+            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                self.download_file(drive_node, tmp_file.name)
+                self.sync_file(tmp_file.name, destination_path)
+                os.remove(tmp_file.name)
+
+    def download_file(self, drive_node, local_path):
+        print(f"Downloading {drive_node.name} to {local_path}")
+        try:
+            with drive_node.open(stream=True) as response, open(
+                local_path, "wb"
+            ) as file:
+                for chunk in response.iter_content(chunk_size=1024):
+                    if chunk:
+                        file.write(chunk)
+            print(f"Successfully downloaded: {drive_node.name}")
+        except Exception as e:
+            print(f"Error downloading file: {e}")
+
+    def sync_file(self, source_path, destination_path):
+        print(f"Syncing {source_path} to {destination_path}")
+        try:
+            subprocess.run(["rsync", "-av", source_path, destination_path], check=True)
+            print(f"Successfully synced: {source_path} to {destination_path}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error syncing file: {e}")
 
 
 class PixelExtractor:
