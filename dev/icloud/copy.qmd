@@ -1,0 +1,92 @@
+```python
+import os
+import tempfile
+import subprocess
+from icloudpy import ICloudPyService
+
+def read_secrets(filename="secrets.txt"):
+    secrets = {}
+    with open(filename, "r") as file:
+        for line in file:
+            key, value = line.strip().split("=", 1)
+            secrets[key] = value
+    return secrets
+
+def process_directory(drive_node, base_path, destination_root, debug=False):
+    if hasattr(drive_node, 'dir'):
+        contents = drive_node.dir()
+        if contents is None:  # This is a file, not a directory
+            path_components = base_path.split('/')
+            date_components = path_components[1:-1]
+            if date_components:
+                year, month, day = date_components[0].split('-')
+                destination_dir = os.path.join(destination_root, year, f"{year}-{month}", f"{year}-{month}-{day}")
+            else:
+                destination_dir = os.path.join(destination_root, "Undated")
+
+            if not os.path.exists(destination_dir) and not debug:
+                os.makedirs(destination_dir)
+
+            destination_path = os.path.join(destination_dir, os.path.basename(base_path))
+
+            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                download_file(drive_node, tmp_file.name)  # Download the file
+
+                if debug:
+                    print(f"DEBUG: Would rsync {tmp_file.name} to {destination_path}")
+                    print("Instead, we'll inspect the audio file metadata and skip copying it.")
+                    with open(tmp_file.name, "rb") as file:
+                        ffprobe_output = subprocess.run(["ffprobe", "-v", "error", "-show_format", "-of", "json", "-i", "pipe:"], input=file.read(), capture_output=True)
+                        print(ffprobe_output.stdout.decode("utf-8"))
+                else:
+                    sync_file(tmp_file.name, destination_path, debug)
+            
+                # Cleanup temporary file
+                os.remove(tmp_file.name)
+        else:  # This is a directory
+            for item in contents:
+                new_base_path = os.path.join(base_path, item)
+                item_node = drive_node[item]
+                process_directory(item_node, new_base_path, destination_root, debug)
+    else:
+        print(f"Warning: '{base_path}' is not accessible or does not exist.")
+
+def download_file(drive_node, local_path):
+    """Download a file from iCloud Drive to a local path."""
+    print(f"Downloading {drive_node.name} to {local_path}")
+    try:
+        with drive_node.open(stream=True) as response, open(local_path, 'wb') as file:
+            for chunk in response.iter_content(chunk_size=1024):
+                if chunk:  # filter out keep-alive new chunks
+                    file.write(chunk)
+        print(f"Successfully downloaded: {drive_node.name}")
+    except Exception as e:
+        print(f"Error downloading file: {e}")
+
+def sync_file(source_path, destination_path, debug=False):
+    if debug:
+        print(f"DEBUG: Would rsync {source_path} to {destination_path}")
+        # print("Instead, we'll inspect the audio file metadata and skip copying it.")
+        # with open(source_path, "rb") as file:
+        #     ffprobe_output = subprocess.run(["ffprobe", "-v", "error", "-show_format", "-of", "json", "-i", "pipe:"], input=file.read(), capture_output=True)
+        #     print(ffprobe_output.stdout.decode("utf-8"))
+    else:
+        print(f"Syncing {source_path} to {destination_path}")
+        try:
+            subprocess.run(["rsync", "-av", source_path, destination_path], check=True)
+            print(f"Successfully synced: {source_path} to {destination_path}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error syncing file: {e}")
+```
+
+```python
+secrets = read_secrets()
+api = ICloudPyService(secrets["icloud_username"], secrets["icloud_password"])
+
+# Ensure we are at the root of iCloud Drive and navigate to 'Just Press Record'
+drive_root = api.drive['Just Press Record']
+
+process_directory(drive_root, base_path="Just Press Record", destination_root="outputs/tests/icloud", debug=False)
+
+```
+
