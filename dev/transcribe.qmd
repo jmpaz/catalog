@@ -1,0 +1,57 @@
+# Workflow: Transcribe
+
+## 1. Ingest
+
+### Pixel
+*assumes that a Google Takeout archive has been extracted into 'data/ingest/Takeout', eg with:*
+```sh
+tar --skip-old-files -xvzf ~/Downloads/takeout-yyyymmddThhmmssZ-001.tgz -C data/ingest/
+```
+
+```python
+from utils.ingest import PixelExtractor
+
+extractor = PixelExtractor(source_dir="data/ingest/Takeout/Recorder", target_dir="data/imports/Pixel")
+extractor.process_directory(debug=True)
+```
+
+
+### iOS/Just Press Record
+```python
+from icloudpy import ICloudPyService
+
+def read_secrets(filename="secrets.txt"):
+    secrets = {}
+    with open(filename, "r") as file:
+        for line in file:
+            key, value = line.strip().split("=", 1)
+            secrets[key] = value
+    return secrets
+
+secrets = read_secrets()
+api = ICloudPyService(secrets["icloud_username"], secrets["icloud_password"])
+
+# 2FA not implemented here; authenticate in dev/icloud/connect.qmd
+```
+
+```py
+from utils.ingest import iCloudExtractor
+
+extractor = iCloudExtractor(api=api, base_path="Just Press Record", target_dir="~/Drive/vault/audio", debug=True)
+extractor.process_source()
+```
+
+
+## 2. Process
+
+```python
+
+```
+
+
+
+## 3. Export
+
+```
+
+```
