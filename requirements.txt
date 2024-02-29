@@ -1,3 +1,1 @@
 git+https://github.com/m-bain/whisperX.git
-icloudpy==0.5.0
-rich
