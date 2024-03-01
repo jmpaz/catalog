@@ -2,107 +2,19 @@
 # ruff: noqa: E402
 ```
 
-## Implementation
-
-### Class definitions
+### Initialize library
 
 ```python
-import os
-from abc import ABC, abstractmethod
-
-class Library:
-    def __init__(self):
-        self.media_objects = []
-
-    def import_media_object(self, file_path, media_object_class):
-        if issubclass(media_object_class, MediaObject):
-            media_object = media_object_class(file_path)
-            self.media_objects.append(media_object)
-            return media_object
-        else:
-            raise ValueError("media_object_class must be a subclass of MediaObject")
-
-
-class MediaObject(ABC):
-    def __init__(self, file_path=None):
-        self.file_path = file_path
-        self.file_content = None
-        if file_path:
-            self.import_file(file_path)
-
-    def import_file(self, file_path):
-        if os.path.isfile(file_path):
-            with open(file_path, 'rb') as file:
-                self.file_content = file.read()
-        else:
-            raise FileNotFoundError(f"No file found at {file_path}")
-
-    def get_details(self):
-        import_path = self.file_path if self.file_path else None
-        file_size = len(self.file_content) if self.file_content else 0
-        return {
-            "import_path": import_path,
-            "file_size": file_size
-        }
-
-    @abstractmethod
-    def process(self):
-        pass
-
-
-class Job:
-    def __init__(self):
-        self.tasks = []
-
-    def add_task(self, task):
-        if not callable(task):
-            raise ValueError("task must be a callable")
-        self.tasks.append(task)
-
-    def execute(self, media_object):
-        for task in self.tasks:
-            task(media_object)
-
-
-class Audio(MediaObject):
-    def process(self):
-        print("Processing generic audio")
-
-class Voice(Audio):
-    def __init__(self, file_path=None):
-        super().__init__(file_path)
-        self.transcripts = []
-
-    def process(self):
-        print("Processing voice")
-
-class Music(Audio):
-    def process(self):
-        print("Processing music")
-
-class Image(MediaObject):
-    def process(self):
-        print("Processing generic image")
-
-class Screenshot(Image):
-    def process(self):
-        print("Processing screenshot")
-
-class Art(Image):
-    def process(self):
-        print("Processing art")
-
-class Photo(Image): # e.g. from camera roll
-    def process(self):
-        print("Processing photo")
+from catalog.workflow import Library
 
 library = Library()
 ```
 
-### Workflow
 
-#### Import media objects
+### Import media objects
+
 ```python
+from catalog.media import Voice, Screenshot
 sample_audio = library.import_media_object("data/samples/oz/01.ogg", Voice)
 print(sample_audio.get_details())
 
@@ -112,75 +24,32 @@ print(sample_image.get_details())
 print(library.media_objects)
 ```
 
-#### Transcribe voice with WhisperX
+
+### Transcribe voice with WhisperX
 
 ```python
-import whisperx
-import gc
-import torch
+from catalog.process import transcribe
 
-
-def transcribe_voice(
-    audio_obj, device="cuda", batch_size=16, compute_type="float16"
-):
-    if not isinstance(audio_obj, Voice):
-        raise ValueError("This task can only be run on Voice objects.")
-
-    print("Preparing to transcribe")
-    model = whisperx.load_model("large-v2", device=device, compute_type=compute_type)
-    audio = whisperx.load_audio(audio_obj.file_path)
-    result = model.transcribe(audio, batch_size=batch_size)
-    print(f"Results (before alignment): {result['segments']}")
-
-    # Clean up
-    gc.collect()
-    torch.cuda.empty_cache()
-    del model
-
-    # Align whisper output
-    model_a, metadata = whisperx.load_align_model(
-        language_code=result["language"], device=device
-    )
-    result = whisperx.align(
-        result["segments"],
-        model_a,
-        metadata,
-        audio,
-        device,
-        return_char_alignments=False,
-    )
-
-    print(f"Results (after alignment): {result['segments']}")
-
-    # Store the aligned transcripts in the Voice object
-    audio_obj.transcripts.append(result["segments"])
-
-    # Clean up align model again
-    gc.collect()
-    torch.cuda.empty_cache()
-    del model_a
-
-```
-
-```python
-# Directly use the task function for demonstration purposes
-transcribe_voice(sample_audio)
+# Call the function directly
+# transcribe(sample_audio)
 
 # Or, use it through a Job
-# job = Job()
-# job.add_task(transcribe_voice)
-# job.execute(sample_audio)
+from catalog.workflow import Job
+transcribe_job = Job()
+transcribe_job.add_task(transcribe)
+transcribe_job.execute(sample_audio)
 
 # Check the transcription results
 print(sample_audio.transcripts)
-
 ```
+
+
+### Inspect results
 
 ```python
 # Print the number of transcripts for the audio object
 print(f"{len(sample_audio.transcripts)} transcripts found for {sample_audio.file_path}")
 
-# Iterate the above for all transcripts
 for i, transcript in enumerate(sample_audio.transcripts):
     print(f"Transcript {i+1}:")
     print(f"{len(transcript)} segments")
