@@ -1,3 +1,7 @@
+```py
+# ruff: noqa: E402
+```
+
 ## Implementation
 
 ### Class definitions
@@ -46,31 +50,29 @@ class MediaObject(ABC):
         pass
 
 
-class Task(ABC):
-    @abstractmethod
-    def run(self, media_object):
-        pass
-
-class Job(ABC):
+class Job:
     def __init__(self):
         self.tasks = []
 
     def add_task(self, task):
+        if not callable(task):
+            raise ValueError("task must be a callable")
         self.tasks.append(task)
 
-    @abstractmethod
-    def execute(self):
-        pass
-
-```
+    def execute(self, media_object):
+        for task in self.tasks:
+            task(media_object)
 
 
-```py
 class Audio(MediaObject):
     def process(self):
         print("Processing generic audio")
 
 class Voice(Audio):
+    def __init__(self, file_path=None):
+        super().__init__(file_path)
+        self.transcripts = []
+
     def process(self):
         print("Processing voice")
 
@@ -94,14 +96,12 @@ class Photo(Image): # e.g. from camera roll
     def process(self):
         print("Processing photo")
 
-```
-
-### Workflow
-```python
 library = Library()
 ```
 
+### Workflow
 
+#### Import media objects
 ```python
 sample_audio = library.import_media_object("data/samples/oz/01.ogg", Voice)
 print(sample_audio.get_details())
@@ -112,3 +112,77 @@ print(sample_image.get_details())
 print(library.media_objects)
 ```
 
+#### Transcribe voice with WhisperX
+
+```python
+import whisperx
+import gc
+import torch
+
+
+def transcribe_voice(
+    audio_obj, device="cuda", batch_size=16, compute_type="float16"
+):
+    if not isinstance(audio_obj, Voice):
+        raise ValueError("This task can only be run on Voice objects.")
+
+    print("Preparing to transcribe")
+    model = whisperx.load_model("large-v2", device=device, compute_type=compute_type)
+    audio = whisperx.load_audio(audio_obj.file_path)
+    result = model.transcribe(audio, batch_size=batch_size)
+    print(f"Results (before alignment): {result['segments']}")
+
+    # Clean up
+    gc.collect()
+    torch.cuda.empty_cache()
+    del model
+
+    # Align whisper output
+    model_a, metadata = whisperx.load_align_model(
+        language_code=result["language"], device=device
+    )
+    result = whisperx.align(
+        result["segments"],
+        model_a,
+        metadata,
+        audio,
+        device,
+        return_char_alignments=False,
+    )
+
+    print(f"Results (after alignment): {result['segments']}")
+
+    # Store the aligned transcripts in the Voice object
+    audio_obj.transcripts.append(result["segments"])
+
+    # Clean up align model again
+    gc.collect()
+    torch.cuda.empty_cache()
+    del model_a
+
+```
+
+```python
+# Directly use the task function for demonstration purposes
+transcribe_voice(sample_audio)
+
+# Or, use it through a Job
+# job = Job()
+# job.add_task(transcribe_voice)
+# job.execute(sample_audio)
+
+# Check the transcription results
+print(sample_audio.transcripts)
+
+```
+
+```python
+# Print the number of transcripts for the audio object
+print(f"{len(sample_audio.transcripts)} transcripts found for {sample_audio.file_path}")
+
+# Iterate the above for all transcripts
+for i, transcript in enumerate(sample_audio.transcripts):
+    print(f"Transcript {i+1}:")
+    print(f"{len(transcript)} segments")
+    print(f"First segment: {transcript[0]}\n")
+```
