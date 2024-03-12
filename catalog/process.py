@@ -25,11 +25,23 @@ def transcribe(audio_obj, device="cuda", batch_size=16, compute_type="float16"):
         device,
         return_char_alignments=False,
     )
-
     print(f"Results (after alignment): {result['segments']}")
 
-    # Store the aligned transcripts in the voice object
-    audio_obj.transcripts.append(result["segments"])
+    # Create a transcription object containing segment nodes
+    transcription = {
+        "nodes": [
+            {
+                "content": segment["text"],
+                "start": segment["start"],
+                "end": segment["end"],
+                "words": segment["words"],
+            }
+            for segment in result["segments"]
+        ]
+    }
+
+    # Store in the audio object's transcripts list
+    audio_obj.transcripts.append(transcription)
 
     # Clean up memory
     gc.collect()

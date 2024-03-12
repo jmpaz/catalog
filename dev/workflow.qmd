@@ -39,8 +39,19 @@ transcribe_job = Job()
 transcribe_job.add_task(transcribe)
 transcribe_job.execute(sample_audio)
 
-# Check the transcription results
-print(sample_audio.transcripts)
+```
+
+```py
+# Inspect segments
+for transcription in sample_audio.transcripts:
+    print("Transcription:")
+    for node in transcription["nodes"]:
+        print(f"  start: {node['start']}")
+        print(f"  end: {node['end']}")
+        print(f"  Content: {node['content']}")
+        print(f"  Words: {node['words']}")
+        print("  ----")
+
 ```
 
 
