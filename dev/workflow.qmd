@@ -41,6 +41,7 @@ transcribe_job.execute(sample_audio)
 
 ```
 
+
 ```py
 # Inspect segments
 for transcription in sample_audio.transcripts:
@@ -48,6 +49,26 @@ for transcription in sample_audio.transcripts:
     for node in transcription["nodes"]:
         print(f"  start: {node['start']}")
         print(f"  end: {node['end']}")
+        print(f"  Content: {node['content']}")
+        print(f"  Words: {node['words']}")
+        print("  ----")
+
+```
+
+#### Transcribe + Diarize
+
+```py
+from catalog.process import transcribe
+
+multi_sample = library.import_media_object("data/samples/multi-speaker.wav", Voice)
+transcribe(multi_sample, diarize=True, speaker_count=2)
+
+for transcription in multi_sample.transcripts:
+    print("Transcription:")
+    for node in transcription["nodes"]:
+        print(f"  start: {node['start']}")
+        print(f"  end: {node['end']}")
+        print(f"  Speaker: {node['speaker']}")
         print(f"  Content: {node['content']}")
         print(f"  Words: {node['words']}")
         print("  ----")
@@ -64,5 +85,13 @@ print(f"{len(sample_audio.transcripts)} transcripts found for {sample_audio.file
 for i, transcript in enumerate(sample_audio.transcripts):
     print(f"Transcript {i+1}:")
     print(f"{len(transcript)} segments")
-    print(f"First segment: {transcript[0]}\n")
+
+# Same for multi_sample
+print(f"{len(multi_sample.transcripts)} transcripts found for {multi_sample.file_path}")
+
+for i, transcript in enumerate(multi_sample.transcripts):
+    print(f"Transcript {i+1}:")
+    print(f"{len(transcript)} segments")
+    # print(f"Leading segments: {transcript['nodes'][:2]}")
+    print(f"Ending segments: {transcript['nodes'][-2:]}")
 ```
