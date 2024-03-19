@@ -48,6 +48,18 @@ class Music(Audio):
         print("Processing music")
 
 
+class Video(MediaObject):
+    def __init__(self, file_path=None):
+        super().__init__(file_path)
+        self.transcripts = []
+
+    def can_transcribe(self):
+        return True
+
+    def process(self):
+        print("Processing generic video")
+
+
 class Image(MediaObject):
     def process(self):
         print("Processing generic image")
