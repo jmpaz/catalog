@@ -5,9 +5,9 @@ class Library:
     def __init__(self):
         self.media_objects = []
 
-    def import_media_object(self, file_path, media_object_class):
+    def import_media_object(self, file_path=None, media_object_class=None, url=None):
         if issubclass(media_object_class, MediaObject):
-            media_object = media_object_class(file_path)
+            media_object = media_object_class(file_path=file_path, url=url)
             self.media_objects.append(media_object)
             return media_object
         else:
