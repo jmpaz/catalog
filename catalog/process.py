@@ -2,6 +2,7 @@ import whisperx
 import torch
 import gc
 from catalog.utils import read_secrets
+import re
 
 
 def transcribe(
@@ -69,7 +70,8 @@ def transcribe(
                 "words": segment["words"],
             }
             for segment in result["segments"]
-        ]
+        ],
+        # TODO: store used params
     }
 
     # Store in the audio object's transcripts list
@@ -79,3 +81,58 @@ def transcribe(
     gc.collect()
     torch.cuda.empty_cache()
     del model_a
+
+
+def format_transcript(
+    transcription: dict,
+    sensitivity=0.5,
+    include_timestamps=True,
+    timestamp_interval=120,
+    timestamp_every_n_chunks=None,
+):
+    for segment in transcript_data["nodes"]:
+        segment["content"] = re.sub(
+            r"^\s+", "", re.sub(r"\s+$", "", segment["content"])
+        )
+
+    chunks = [segment["content"] for segment in transcript_data["nodes"]]
+    start_times = [segment["start"] for segment in transcript_data["nodes"]]
+    end_times = [segment["end"] for segment in transcript_data["nodes"]]
+
+    pauses = [start_times[i] - end_times[i - 1] for i in range(1, len(start_times))]
+    min_pause = min(pauses)
+    max_pause = max(pauses)
+    threshold = min_pause + (max_pause - min_pause) * sensitivity
+
+    result = "**00:00**\n\n"
+    last_timestamp = 0
+    chunk_counter = 0
+    total_duration = end_times[-1]
+
+    for i in range(len(chunks)):
+        if include_timestamps:
+            current_time = start_times[i]
+            if (current_time - last_timestamp >= timestamp_interval) or (
+                timestamp_every_n_chunks
+                and chunk_counter % timestamp_every_n_chunks == 0
+            ):
+                if not result.endswith("\n\n"):
+                    result += "\n\n"
+                if total_duration >= 3600:
+                    timestamp = f"\n**{int(current_time // 3600):02d}:{int((current_time % 3600) // 60):02d}:{int(current_time % 60):02d}**\n\n"
+                else:
+                    timestamp = f"\n**{int(current_time // 60):02d}:{int(current_time % 60):02d}**\n\n"
+                result += timestamp
+                last_timestamp = current_time
+
+        result += chunks[i]
+        chunk_counter += 1
+
+        if i < len(chunks) - 1:
+            pause = start_times[i + 1] - end_times[i]
+            if pause < threshold:
+                result += " "
+            else:
+                result += "\n\n"
+
+    return result
