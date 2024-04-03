@@ -90,14 +90,14 @@ def format_transcript(
     timestamp_interval=120,
     timestamp_every_n_chunks=None,
 ):
-    for segment in transcript_data["nodes"]:
+    for segment in transcription["nodes"]:
         segment["content"] = re.sub(
             r"^\s+", "", re.sub(r"\s+$", "", segment["content"])
         )
 
-    chunks = [segment["content"] for segment in transcript_data["nodes"]]
-    start_times = [segment["start"] for segment in transcript_data["nodes"]]
-    end_times = [segment["end"] for segment in transcript_data["nodes"]]
+    chunks = [segment["content"] for segment in transcription["nodes"]]
+    start_times = [segment["start"] for segment in transcription["nodes"]]
+    end_times = [segment["end"] for segment in transcription["nodes"]]
 
     pauses = [start_times[i] - end_times[i - 1] for i in range(1, len(start_times))]
     min_pause = min(pauses)
