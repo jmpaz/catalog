@@ -8,6 +8,7 @@ import re
 def transcribe(
     audio_obj,
     device="cuda",
+    device_index=0,
     batch_size=16,
     compute_type="float16",
     diarize=False,
@@ -21,6 +22,7 @@ def transcribe(
     model = whisperx.load_model(
         "large-v2",
         device=device,
+        device_index=device_index,
         compute_type=compute_type,
         asr_options={"initial_prompt": initial_prompt},
     )
