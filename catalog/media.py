@@ -2,6 +2,21 @@ import os
 import tempfile
 import yt_dlp
 from abc import ABC, abstractmethod
+from catalog.process import format_transcript
+
+
+def can_transcribe(cls):
+    def set_text(self):
+        if self.transcripts:
+            latest_transcript = self.transcripts[-1]
+            if "processed" in latest_transcript:
+                self.text = latest_transcript["processed"]
+            else:
+                self.text = format_transcript(latest_transcript)
+
+    cls.set_text = set_text
+    cls.can_transcribe = lambda self: True
+    return cls
 
 
 class MediaObject(ABC):
@@ -9,6 +24,8 @@ class MediaObject(ABC):
         self.file_path = file_path
         self.url = url
         self.file_content = None
+        self.text = ""
+        # self.outline = ""
         if file_path:
             self.import_file(file_path)
         elif url:
@@ -44,19 +61,26 @@ class MediaObject(ABC):
     def process(self):
         pass
 
+    def set_text(self):
+        pass
 
+    def can_transcribe(self):
+        return False
+
+
+@can_transcribe
 class Audio(MediaObject):
+    def __init__(self, file_path=None, url=None):
+        super().__init__(file_path, url)
+        self.transcripts = []
+
     def process(self):
         print("Processing generic audio")
 
 
 class Voice(Audio):
     def __init__(self, file_path=None, url=None):
-        super().__init__(file_path)
-        self.transcripts = []
-
-    def can_transcribe(self):
-        return True
+        super().__init__(file_path, url)
 
     def process(self):
         print("Processing voice")
@@ -67,13 +91,11 @@ class Music(Audio):
         print("Processing music")
 
 
+@can_transcribe
 class Video(MediaObject):
     def __init__(self, file_path=None, url=None):
         super().__init__(file_path, url)
         self.transcripts = []
-
-    def can_transcribe(self):
-        return True
 
     def process(self):
         print("Processing generic video")

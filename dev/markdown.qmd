@@ -1,0 +1,44 @@
+```py
+# ruff: noqa: E402
+```
+
+## Import and transcribe
+
+```python
+from catalog.workflow import Library
+from catalog.media import Voice
+library = Library()
+
+file_path = "data/samples/oz/02.ogg"
+file = library.import_media_object(file_path, Voice)
+
+```
+
+
+```py
+from catalog.process import transcribe
+
+transcribe(file)
+transcription = file.transcripts[-1]
+
+```
+
+
+### Inspect result
+
+```python
+from catalog.process import format_transcript
+
+text = format_transcript(transcription, sensitivity=0.02, timestamp_interval=30)
+print(text)
+
+```
+
+
+## Set the `Voice` object's `text` attribute
+
+```python
+file.set_text()
+print(file.text)
+
+```
