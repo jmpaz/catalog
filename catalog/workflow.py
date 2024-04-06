@@ -15,7 +15,7 @@ class Library:
         else:
             raise ValueError("media_object_class must be a subclass of MediaObject")
 
-    def create_pointer(self, media_object, name=None):
+    def create_pointer(self, media_object, name=None, dest_path="data/pointers"):
         id = str(uuid.uuid4())
         obj_type = media_object.__class__.__name__
         frontmatter = f"""---
@@ -29,13 +29,13 @@ tags:
 
         filename = name if name else id
 
-        self.write_file(filename, content)
+        self.write_file(dest_path, filename, content)
 
     @staticmethod
-    def write_file(name, content):
-        dest_path = "data/pointers"
-        os.makedirs(dest_path, exist_ok=True)
-        with open(f"{dest_path}/{name}.md", "w") as file:
+    def write_file(path, name, content):
+        path = path
+        os.makedirs(path, exist_ok=True)
+        with open(f"{path}/{name}.md", "w") as file:
             file.write(content)
 
 
