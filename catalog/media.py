@@ -12,7 +12,9 @@ def can_transcribe(cls):
             if "processed" in latest_transcript:
                 self.text = latest_transcript["processed"]
             else:
-                self.text = format_transcript(latest_transcript)
+                self.text = format_transcript(
+                    latest_transcript, sensitivity=0.02, timestamp_interval=40
+                )
 
     cls.set_text = set_text
     cls.can_transcribe = lambda self: True
