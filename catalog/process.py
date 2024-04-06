@@ -102,17 +102,23 @@ def format_transcript(
     end_times = [segment["end"] for segment in transcription["nodes"]]
 
     pauses = [start_times[i] - end_times[i - 1] for i in range(1, len(start_times))]
-    min_pause = min(pauses)
-    max_pause = max(pauses)
-    threshold = min_pause + (max_pause - min_pause) * sensitivity
+    if pauses:
+        min_pause = min(pauses)
+        max_pause = max(pauses)
+        threshold = min_pause + (max_pause - min_pause) * sensitivity
+    else:
+        # handle single segment
+        min_pause = 0
+        max_pause = 0
+        threshold = 0
 
     result = "**00:00**\n\n"
     last_timestamp = 0
     chunk_counter = 0
-    total_duration = end_times[-1]
+    total_duration = end_times[-1] if end_times else 0
 
     for i in range(len(chunks)):
-        if include_timestamps:
+        if include_timestamps and start_times:
             current_time = start_times[i]
             if (current_time - last_timestamp >= timestamp_interval) or (
                 timestamp_every_n_chunks
@@ -131,7 +137,7 @@ def format_transcript(
         chunk_counter += 1
 
         if i < len(chunks) - 1:
-            pause = start_times[i + 1] - end_times[i]
+            pause = start_times[i + 1] - end_times[i] if i + 1 < len(start_times) else 0
             if pause < threshold:
                 result += " "
             else:
