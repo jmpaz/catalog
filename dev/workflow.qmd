@@ -5,7 +5,7 @@
 ### Initialize library
 
 ```python
-from catalog.workflow import Library
+from catalog import Library
 
 library = Library()
 ```
@@ -38,7 +38,7 @@ from catalog.process import transcribe
 # transcribe(sample_audio)
 
 # Or, use it through a Job
-from catalog.workflow import Job
+from catalog import Job
 transcribe_job = Job()
 transcribe_job.add_task(transcribe)
 transcribe_job.execute(sample_audio)

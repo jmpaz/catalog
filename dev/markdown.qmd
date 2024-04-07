@@ -5,7 +5,7 @@
 ## Import and transcribe
 
 ```python
-from catalog.workflow import Library
+from catalog import Library
 from catalog.media import Voice
 library = Library()
 

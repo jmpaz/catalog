@@ -7,7 +7,7 @@
 We process below the viral [demo](https://twitter.com/deepfates/status/1769963585503941068) of the potent [worldsim](https://twitter.com/karan4d/status/1768836844207378463).
 
 ```python
-from catalog.workflow import Library
+from catalog import Library
 from catalog.media import Video
 library = Library()
 
