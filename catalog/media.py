@@ -1,4 +1,5 @@
 import os
+import uuid
 import tempfile
 import yt_dlp
 from abc import ABC, abstractmethod
@@ -22,12 +23,14 @@ def can_transcribe(cls):
 
 
 class MediaObject(ABC):
-    def __init__(self, file_path=None, url=None):
+    def __init__(self, file_path=None, url=None, name=None):
+        self.id = str(uuid.uuid4())
+        self.name = name
         self.file_path = file_path
         self.url = url
-        self.file_content = None
         self.text = ""
-        # self.outline = ""
+        self.file_content = None
+
         if file_path:
             self.import_file(file_path)
         elif url:
@@ -72,8 +75,8 @@ class MediaObject(ABC):
 
 @can_transcribe
 class Audio(MediaObject):
-    def __init__(self, file_path=None, url=None):
-        super().__init__(file_path, url)
+    def __init__(self, file_path=None, url=None, name=None):
+        super().__init__(file_path, url, name)
         self.transcripts = []
 
     def process(self):
@@ -81,22 +84,25 @@ class Audio(MediaObject):
 
 
 class Voice(Audio):
-    def __init__(self, file_path=None, url=None):
-        super().__init__(file_path, url)
+    def __init__(self, file_path=None, url=None, name=None):
+        super().__init__(file_path, url, name)
 
     def process(self):
         print("Processing voice")
 
 
 class Music(Audio):
+    def __init__(self, file_path=None, url=None, name=None):
+        super().__init__(file_path, url, name)
+
     def process(self):
         print("Processing music")
 
 
 @can_transcribe
 class Video(MediaObject):
-    def __init__(self, file_path=None, url=None):
-        super().__init__(file_path, url)
+    def __init__(self, file_path=None, url=None, name=None):
+        super().__init__(file_path, url, name)
         self.transcripts = []
 
     def process(self):
@@ -104,20 +110,32 @@ class Video(MediaObject):
 
 
 class Image(MediaObject):
+    def __init__(self, file_path=None, url=None, name=None):
+        super().__init__(file_path, url, name)
+
     def process(self):
         print("Processing generic image")
 
 
 class Screenshot(Image):
+    def __init__(self, file_path=None, url=None, name=None):
+        super().__init__(file_path, url, name)
+
     def process(self):
         print("Processing screenshot")
 
 
 class Art(Image):
+    def __init__(self, file_path=None, url=None, name=None):
+        super().__init__(file_path, url, name)
+
     def process(self):
         print("Processing art")
 
 
-class Photo(Image):  # e.g. from camera roll
+class Photo(Image):
+    def __init__(self, file_path=None, url=None, name=None):
+        super().__init__(file_path, url, name)
+
     def process(self):
         print("Processing photo")

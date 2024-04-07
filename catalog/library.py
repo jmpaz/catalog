@@ -1,5 +1,4 @@
 import os
-import uuid
 from catalog.media import MediaObject
 
 
@@ -7,16 +6,19 @@ class Library:
     def __init__(self):
         self.media_objects = []
 
-    def import_media_object(self, file_path=None, media_object_class=None, url=None):
+    def import_media_object(
+        self, file_path=None, media_object_class=None, name=None, url=None
+    ):
         if issubclass(media_object_class, MediaObject):
-            media_object = media_object_class(file_path=file_path, url=url)
+            media_object = media_object_class(file_path=file_path, url=url, name=name)
             self.media_objects.append(media_object)
             return media_object
         else:
             raise ValueError("media_object_class must be a subclass of MediaObject")
 
-    def create_pointer(self, media_object, name=None, dest_path="data/pointers"):
-        id = str(uuid.uuid4())
+    def create_pointer(self, media_object, dest_path="data/pointers"):
+        id = media_object.id
+        name = media_object.name if media_object.name else None
         obj_type = media_object.__class__.__name__
         frontmatter = f"""---
 id:

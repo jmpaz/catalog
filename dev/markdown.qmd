@@ -41,7 +41,6 @@ print(file.text)
 import os
 
 library.create_pointer(file)
-# library.create_pointer(file, name="my_file")
 
 os.listdir("data/pointers")
 
