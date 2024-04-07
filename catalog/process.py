@@ -13,6 +13,7 @@ def transcribe(
     compute_type="float16",
     diarize=False,
     speaker_count=1,
+    whisper_version="large-v3",
     initial_prompt=None,
 ):
     if not hasattr(audio_obj, "can_transcribe"):
@@ -20,7 +21,7 @@ def transcribe(
 
     print("Preparing to transcribe")
     model = whisperx.load_model(
-        "large-v2",
+        whisper_version,
         device=device,
         device_index=device_index,
         compute_type=compute_type,
