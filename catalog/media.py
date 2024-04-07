@@ -64,10 +64,6 @@ class MediaObject(ABC):
                     self.file_path
                 )
 
-    def get_details(self):
-        import_path = self.file_path if self.file_path else None
-        file_size = len(self.file_content) if self.file_content else 0
-        return {"import_path": import_path, "file_size": file_size}
     @staticmethod
     def get_file_dates(file_path):
         if os.path.isfile(file_path):

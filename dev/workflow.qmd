@@ -15,16 +15,16 @@ library = Library()
 
 ```python
 from catalog.media import Voice, Screenshot, Video
-sample_audio = library.import_media_object("data/samples/oz/01.ogg", Voice)
-print(sample_audio.get_details())
 
+sample_audio = library.import_media_object("data/samples/oz/01.ogg", Voice)
 sample_image = library.import_media_object("data/samples/screenshots/2024-03-01-09-05-22.png", Screenshot)
-print(sample_image.get_details())
+library.query([sample_audio, sample_image])
 
 # downloads on import
 # video = library.import_media_object(url="https://www.youtube.com/watch?v=7Pq-S557XQU", media_object_class=Video)
 
-print(library.media_objects)
+# list all objects
+# library.query()
 
 ```
 
