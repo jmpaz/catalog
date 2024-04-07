@@ -1,5 +1,6 @@
 import os
 import uuid
+from datetime import datetime
 import tempfile
 import yt_dlp
 from abc import ABC, abstractmethod
@@ -27,6 +28,8 @@ class MediaObject(ABC):
         self.id = str(uuid.uuid4())
         self.name = name
         self.file_path = file_path
+        self.date_created = None
+        self.date_modified = None
         self.url = url
         self.text = ""
         self.file_content = None
@@ -40,6 +43,7 @@ class MediaObject(ABC):
         if os.path.isfile(file_path):
             with open(file_path, "rb") as file:
                 self.file_content = file.read()
+            self.date_created, self.date_modified = self.get_file_dates(file_path)
         else:
             raise FileNotFoundError(f"No file found at {file_path}")
 
@@ -56,11 +60,23 @@ class MediaObject(ABC):
                 # Read the downloaded file into memory
                 with open(self.file_path, "rb") as file:
                     self.file_content = file.read()
+                self.date_created, self.date_modified = self.get_file_dates(
+                    self.file_path
+                )
 
     def get_details(self):
         import_path = self.file_path if self.file_path else None
         file_size = len(self.file_content) if self.file_content else 0
         return {"import_path": import_path, "file_size": file_size}
+    @staticmethod
+    def get_file_dates(file_path):
+        if os.path.isfile(file_path):
+            stat = os.stat(file_path)
+            date_created = datetime.fromtimestamp(stat.st_ctime)
+            date_modified = datetime.fromtimestamp(stat.st_mtime)
+            return date_created, date_modified
+        else:
+            return None, None
 
     @abstractmethod
     def process(self):
