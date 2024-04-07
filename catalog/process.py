@@ -13,7 +13,7 @@ def transcribe(
     compute_type="float16",
     diarize=False,
     speaker_count=1,
-    whisper_version="large-v3",
+    whisper_version="large-v2",
     initial_prompt=None,
 ):
     if not hasattr(audio_obj, "can_transcribe"):
