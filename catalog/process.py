@@ -68,7 +68,7 @@ def transcribe(
             {
                 "start": segment["start"],
                 "end": segment["end"],
-                "speaker": segment["speaker"] if diarize else None,
+                "speaker": segment.get("speaker") if diarize else None,
                 "content": segment["text"],
                 "words": segment["words"],
             }
@@ -92,6 +92,7 @@ def format_transcript(
     include_timestamps=True,
     timestamp_interval=120,
     timestamp_every_n_chunks=None,
+    names=None,
 ):
     for segment in transcription["nodes"]:
         segment["content"] = re.sub(
@@ -101,6 +102,7 @@ def format_transcript(
     chunks = [segment["content"] for segment in transcription["nodes"]]
     start_times = [segment["start"] for segment in transcription["nodes"]]
     end_times = [segment["end"] for segment in transcription["nodes"]]
+    speakers = [segment.get("speaker") for segment in transcription["nodes"]]
 
     pauses = [start_times[i] - end_times[i - 1] for i in range(1, len(start_times))]
     if pauses:
@@ -117,6 +119,7 @@ def format_transcript(
     last_timestamp = 0
     chunk_counter = 0
     total_duration = end_times[-1] if end_times else 0
+    current_speaker = None
 
     for i in range(len(chunks)):
         if include_timestamps and start_times:
@@ -134,12 +137,26 @@ def format_transcript(
                 result += timestamp
                 last_timestamp = current_time
 
+        speaker = speakers[i]
+        if speaker != current_speaker:
+            if current_speaker is not None and not result.endswith("\n\n"):
+                result += "\n\n"
+            current_speaker = speaker
+            if speaker is not None:
+                speaker_index = int(speaker.split("_")[-1])
+                if names and 0 <= speaker_index < len(names):
+                    result += f"_{names[speaker_index]}:_ "
+                else:
+                    result += f"_S{speaker_index + 1}:_ "
+            else:
+                result += "_S?:_ "
+
         result += chunks[i]
         chunk_counter += 1
 
         if i < len(chunks) - 1:
             pause = start_times[i + 1] - end_times[i] if i + 1 < len(start_times) else 0
-            if pause < threshold:
+            if pause < threshold and speakers[i + 1] == current_speaker:
                 result += " "
             else:
                 result += "\n\n"
