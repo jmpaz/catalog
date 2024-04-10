@@ -11,6 +11,7 @@ def transcribe(
     device_index=0,
     batch_size=16,
     compute_type="float16",
+    vad_sensitivity=0.1,
     diarize=False,
     speaker_count=1,
     whisper_version="large-v2",
@@ -26,6 +27,7 @@ def transcribe(
         device_index=device_index,
         compute_type=compute_type,
         asr_options={"initial_prompt": initial_prompt},
+        vad_options={"vad_onset": vad_sensitivity, "vad_offset": vad_sensitivity},
     )
     audio = whisperx.load_audio(audio_obj.file_path)
     result = model.transcribe(audio, batch_size=batch_size)
