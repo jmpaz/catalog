@@ -33,7 +33,6 @@ class MediaObject(ABC):
         self.date_modified = None
         self.url = url
         self.text = ""
-        self.file_content = None
 
         if file_path:
             self.import_file(file_path)
@@ -42,8 +41,6 @@ class MediaObject(ABC):
 
     def import_file(self, file_path):
         if os.path.isfile(file_path):
-            with open(file_path, "rb") as file:
-                self.file_content = file.read()
             self.date_created, self.date_modified = self.get_file_dates(file_path)
         else:
             raise FileNotFoundError(f"No file found at {file_path}")
@@ -56,14 +53,9 @@ class MediaObject(ABC):
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
-                self.file_path = ydl.prepare_filename(info)
-
-                # Read the downloaded file into memory
-                with open(self.file_path, "rb") as file:
-                    self.file_content = file.read()
-                self.date_created, self.date_modified = self.get_file_dates(
-                    self.file_path
-                )
+                path = ydl.prepare_filename(info)
+                self.date_created, self.date_modified = self.get_file_dates(path)
+                self.file_path = path
 
     def get_delimited_text(self, format="md"):
         """
