@@ -5,6 +5,7 @@ import tempfile
 import yt_dlp
 from abc import ABC, abstractmethod
 from catalog.process import format_transcript
+from contextualize.reference import process_text as delimit_text
 
 
 def can_transcribe(cls):
@@ -63,6 +64,26 @@ class MediaObject(ABC):
                 self.date_created, self.date_modified = self.get_file_dates(
                     self.file_path
                 )
+
+    def get_delimited_text(self, format="md"):
+        """
+        Delimit the object's text content in the specified format.
+
+        Args:
+            format (str): The format to use for delimiting the text content. Supports "md" (default) and "xml".
+            - "md" will wrap the text in a Markdown code block.
+            - "xml" will wrap the text in XML tags.
+
+        Returns:
+            str: A string containing the text content wrapped according to the specified format.
+        """
+        if format != "md" and format != "xml":
+            raise ValueError(f"Unsupported format '{format}'; must be 'md' or 'xml'")
+        if self.text:
+            label = f"{self.name}.md" if self.name else "markdown"
+            return delimit_text(self.text, format=format, label=label)
+        else:
+            raise ValueError(f"{self.id} has no text to delimit")
 
     @staticmethod
     def get_file_dates(file_path):

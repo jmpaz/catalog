@@ -2,7 +2,7 @@
 # ruff: noqa: E402
 ```
 
-### Initialize library
+## Initialize library
 
 ```python
 from catalog import Library
@@ -29,38 +29,21 @@ library.query([sample_audio, sample_image])
 ```
 
 
-### Transcribe voice with WhisperX
+## Transcribe voice with WhisperX
 
 ```python
 from catalog.process import transcribe
 
-# Call the function directly
-# transcribe(sample_audio)
+transcribe(sample_audio)
 
-# Or, use it through a Job
-from catalog import Job
-transcribe_job = Job()
-transcribe_job.add_task(transcribe)
-transcribe_job.execute(sample_audio)
+# update the Voice object's text attribute with the result of the most recent transcription
+sample_audio.set_text()  
+
+print(sample_audio.text)
 
 ```
 
-
-```py
-# Inspect segments
-for transcription in sample_audio.transcripts:
-    print("Transcription:")
-    for node in transcription["nodes"]:
-        print(f"  start: {node['start']}")
-        print(f"  end: {node['end']}")
-        print(f"  Content: {node['content']}")
-        print(f"  Words: {node['words']}")
-        print("  ----")
-
-```
-
-#### Transcribe + Diarize
-
+**Transcribe + Diarize**
 ```py
 from catalog.process import transcribe
 
@@ -80,22 +63,10 @@ for transcription in multi_sample.transcripts:
 ```
 
 
-### Inspect results
 
+### Get delimited text
 ```python
-# Print the number of transcripts for the audio object
-print(f"{len(sample_audio.transcripts)} transcripts found for {sample_audio.file_path}")
+print(sample_audio.get_delimited_text(format="md"))
 
-for i, transcript in enumerate(sample_audio.transcripts):
-    print(f"Transcript {i+1}:")
-    print(f"{len(transcript)} segments")
-
-# Same for multi_sample
-print(f"{len(multi_sample.transcripts)} transcripts found for {multi_sample.file_path}")
-
-for i, transcript in enumerate(multi_sample.transcripts):
-    print(f"Transcript {i+1}:")
-    print(f"{len(transcript)} segments")
-    # print(f"Leading segments: {transcript['nodes'][:2]}")
-    print(f"Ending segments: {transcript['nodes'][-2:]}")
 ```
+
