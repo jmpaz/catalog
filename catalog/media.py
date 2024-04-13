@@ -9,14 +9,16 @@ from contextualize.reference import process_text as delimit_text
 
 
 def can_transcribe(cls):
-    def set_text(self):
+    def set_text(self, format_sensitivity=0.02, format_interval=40):
         if self.transcripts:
             latest_transcript = self.transcripts[-1]
             if "processed" in latest_transcript:
                 self.text = latest_transcript["processed"]
             else:
                 self.text = format_transcript(
-                    latest_transcript, sensitivity=0.02, timestamp_interval=40
+                    latest_transcript,
+                    format_sensitivity,
+                    timestamp_interval=format_interval,
                 )
 
     cls.set_text = set_text
