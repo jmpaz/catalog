@@ -7,7 +7,7 @@
 ```python
 from catalog import Library
 
-library = Library()
+library = Library("dev/library.json")
 ```
 
 
@@ -67,6 +67,13 @@ for transcription in multi_sample.transcripts:
 ### Get delimited text
 ```python
 print(sample_audio.get_delimited_text(format="md"))
+
+```
+
+
+## Save library
+```py
+library.save_library()
 
 ```
 
