@@ -10,16 +10,16 @@ from contextualize.reference import process_text as delimit_text
 
 def can_transcribe(cls):
     def set_text(self, format_sensitivity=0.02, format_interval=40):
-        if self.transcripts:
+        if self.processed_text:
+            latest_processed = self.processed_text[-1]
+            self.text = latest_processed["text"]
+        elif self.transcripts:
             latest_transcript = self.transcripts[-1]
-            if "processed" in latest_transcript:
-                self.text = latest_transcript["processed"]
-            else:
-                self.text = format_transcript(
-                    latest_transcript,
-                    format_sensitivity,
-                    timestamp_interval=format_interval,
-                )
+            self.text = format_transcript(
+                latest_transcript,
+                format_sensitivity,
+                timestamp_interval=format_interval,
+            )
 
     cls.set_text = set_text
     cls.can_transcribe = lambda self: True
@@ -35,6 +35,7 @@ class MediaObject(ABC):
         self.date_modified = None
         self.url = url
         self.text = ""
+        self.processed_text = []
 
         if file_path:
             self.import_file(file_path)
@@ -98,6 +99,20 @@ class MediaObject(ABC):
 
     def can_transcribe(self):
         return False
+
+    def store_processed_text(self, processed_str, source=None, label=None):
+        # ensure the string doesn't already exist as a text value of any processed_text entry
+        if any(processed_str == entry["text"] for entry in self.processed_text):
+            raise ValueError(f"Text is already stored in processed_text for {self.id}")
+
+        entry = {
+            "id": str(uuid.uuid4()),
+            "label": label,
+            "source": source,
+            "date_stored": datetime.now().isoformat(),
+            "text": processed_str,
+        }
+        self.processed_text.append(entry)
 
 
 @can_transcribe

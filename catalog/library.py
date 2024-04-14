@@ -167,6 +167,7 @@ tags:
             else None,
             "md5_hash": media_object.md5_hash,
             "text": media_object.text,
+            "processed_text": media_object.processed_text,
             "transcripts": media_object.transcripts
             if hasattr(media_object, "transcripts")
             else [],
@@ -207,6 +208,7 @@ tags:
         )
         media_object.md5_hash = serialized_data["md5_hash"]
         media_object.text = serialized_data["text"]
+        media_object.processed_text = serialized_data.get("text_processed", [])
         if hasattr(media_object, "transcripts"):
             media_object.transcripts = serialized_data["transcripts"]
         return media_object
