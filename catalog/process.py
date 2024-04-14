@@ -1,4 +1,6 @@
 from catalog.utils import read_secrets
+import uuid
+from datetime import datetime
 import re
 
 
@@ -61,8 +63,16 @@ def transcribe(
 
         result = whisperx.assign_word_speakers(diarize_segments, result)
 
-    # Create a transcription object containing segment nodes
     transcription = {
+        "id": str(uuid.uuid4()),
+        "date_stored": datetime.now().isoformat(),
+        "params": {
+            "whisper_version": whisper_version,
+            "initial_prompt": initial_prompt,
+            "diarize": diarize,
+            "speaker_count": speaker_count,
+            "vad_sensitivity": vad_sensitivity,
+        },  # Store the relevant transcribe() parameters
         "nodes": [
             {
                 "start": segment["start"],
@@ -73,13 +83,9 @@ def transcribe(
             }
             for segment in result["segments"]
         ],
-        # TODO: store used params
     }
-
-    # Store in the audio object's transcripts list
     audio_obj.transcripts.append(transcription)
 
-    # Clean up memory
     gc.collect()
     torch.cuda.empty_cache()
     del model_a
