@@ -1,3 +1,5 @@
 git+https://github.com/m-bain/whisperX.git
 git+https://github.com/jmpaz/contextualize.git
+pyperclip>=1.8.2
+click >= 8.1.7
 yt-dlp>=2024.3.10

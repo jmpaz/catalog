@@ -88,11 +88,12 @@ class Library:
 
     def query(self, media_objects=None):
         if media_objects is None:
-            media_objects = self.media_objects
+            raise ValueError("No MediaObjects provided")
         elif not isinstance(media_objects, list):
             media_objects = [media_objects]
 
         for media_object in media_objects:
+            # print object attributes
             for attr, value in media_object.__dict__.items():
                 if (
                     not attr.startswith("_")
@@ -106,6 +107,15 @@ class Library:
                         print(f"{attr}: {value}")
 
             print()  # newline
+
+    def fetch(self, ids=None):
+        """Fetch media objects by ID."""
+        output = []
+
+        if ids:
+            output.extend([obj for obj in self.media_objects if obj.id[:5] in ids])
+
+        return output
 
     def _print_value(self, value, indent=2):
         if isinstance(value, dict):

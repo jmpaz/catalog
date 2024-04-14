@@ -1,6 +1,3 @@
-import whisperx
-import torch
-import gc
 from catalog.utils import read_secrets
 import re
 
@@ -17,6 +14,10 @@ def transcribe(
     whisper_version="large-v2",
     initial_prompt=None,
 ):
+    import whisperx
+    import torch
+    import gc
+
     if not hasattr(audio_obj, "can_transcribe"):
         raise ValueError("This media object cannot be transcribed")
 
@@ -31,7 +32,6 @@ def transcribe(
     )
     audio = whisperx.load_audio(audio_obj.file_path)
     result = model.transcribe(audio, batch_size=batch_size)
-    print(f"Results (before alignment): {result['segments']}")
 
     # Align whisper output
     model_a, metadata = whisperx.load_align_model(
@@ -45,7 +45,6 @@ def transcribe(
         device,
         return_char_alignments=False,
     )
-    print(f"Results (after alignment): {result['segments']}")
 
     if diarize:
         hf_token = read_secrets()["HF_TOKEN"]
@@ -61,8 +60,6 @@ def transcribe(
             diarize_segments = diarize_model(audio)
 
         result = whisperx.assign_word_speakers(diarize_segments, result)
-        print(diarize_segments)
-        print(f"Results (after diarization): {result['segments']}")
 
     # Create a transcription object containing segment nodes
     transcription = {
