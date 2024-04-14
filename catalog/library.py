@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import hashlib
 from datetime import datetime
@@ -12,9 +13,25 @@ class Library:
         self.load_library()
 
     def import_media_object(
-        self, file_path=None, media_object_class=None, name=None, url=None
+        self, file_path=None, media_object_class=None, name=None, url=None, auto=False
     ):
-        if issubclass(media_object_class, MediaObject):
+        if auto:
+            ext_map = {
+                "Voice": [".mp3", ".wav", ".flac", ".m4a", ".ogg"],
+                "Video": [".mp4", ".mkv", ".webm", ".avi", ".mov"],
+            }
+            # set media_object_class to the first class that supports the extension
+            ext = os.path.splitext(file_path)[1].lower()
+            for obj_class, exts in ext_map.items():
+                if ext in exts:
+                    media_object_class = getattr(
+                        sys.modules["catalog.media"], obj_class
+                    )
+                    break
+            else:
+                raise ValueError(f"Unsupported file type: {ext}")
+
+        if media_object_class and issubclass(media_object_class, MediaObject):
             md5_hash = self.compute_md5_hash(file_path)
             existing_object = self.fetch_object_by_hash(md5_hash)
             if existing_object:
