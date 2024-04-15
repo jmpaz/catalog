@@ -27,15 +27,20 @@ def can_transcribe(cls):
 
 
 class MediaObject(ABC):
-    def __init__(self, file_path=None, url=None, name=None):
+    def __init__(self, file_path=None, url=None, name=None, source_filename=None):
         self.id = str(uuid.uuid4())
-        self.name = name
         self.file_path = file_path
-        self.date_created = None
-        self.date_modified = None
-        self.url = url
         self.text = ""
         self.processed_text = []
+        self.metadata = {
+            "name": name,
+            "url": url,
+            "date_created": None,
+            "date_modified": None,
+            "source_filename": source_filename or os.path.basename(file_path)
+            if file_path
+            else None,
+        }
 
         if file_path:
             self.import_file(file_path)
@@ -44,7 +49,9 @@ class MediaObject(ABC):
 
     def import_file(self, file_path):
         if os.path.isfile(file_path):
-            self.date_created, self.date_modified = self.get_file_dates(file_path)
+            self.metadata["date_created"], self.metadata["date_modified"] = (
+                self.get_file_dates(file_path)
+            )
         else:
             raise FileNotFoundError(f"No file found at {file_path}")
 
@@ -57,7 +64,9 @@ class MediaObject(ABC):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 path = ydl.prepare_filename(info)
-                self.date_created, self.date_modified = self.get_file_dates(path)
+                self.metadata["date_created"], self.metadata["date_modified"] = (
+                    self.get_file_dates(path)
+                )
                 self.file_path = path
 
     def get_delimited_text(self, format="md"):

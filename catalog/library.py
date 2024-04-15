@@ -156,15 +156,18 @@ tags:
     def serialize_object(self, media_object):
         serialized_data = {
             "id": media_object.id,
-            "name": media_object.name,
+            "metadata": {
+                "name": media_object.metadata.get("name"),
+                "url": media_object.metadata.get("url"),
+                "date_created": media_object.metadata.get("date_created").isoformat()
+                if media_object.metadata.get("date_created")
+                else None,
+                "date_modified": media_object.metadata.get("date_modified").isoformat()
+                if media_object.metadata.get("date_modified")
+                else None,
+                "source_filename": media_object.metadata.get("source_filename"),
+            },
             "file_path": media_object.file_path,
-            "url": media_object.url,
-            "date_created": media_object.date_created.isoformat()
-            if media_object.date_created
-            else None,
-            "date_modified": media_object.date_modified.isoformat()
-            if media_object.date_modified
-            else None,
             "md5_hash": media_object.md5_hash,
             "text": media_object.text,
             "processed_text": media_object.processed_text,
