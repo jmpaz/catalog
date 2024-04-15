@@ -195,23 +195,24 @@ tags:
 
         media_object = media_object_class(
             file_path=serialized_data["file_path"],
-            url=serialized_data["url"],
-            name=serialized_data["name"],
+            url=serialized_data["metadata"].get("url"),
+            name=serialized_data["metadata"].get("name"),
+            # source_filename=serialized_data["metadata"].get("source_filename"),  # handled in MediaObject constructor
         )
         media_object.id = serialized_data["id"]
-        media_object.date_created = (
-            datetime.fromisoformat(serialized_data["date_created"])
-            if serialized_data["date_created"]
+        media_object.metadata["date_created"] = (
+            datetime.fromisoformat(serialized_data["metadata"].get("date_created"))
+            if serialized_data["metadata"].get("date_created")
             else None
         )
-        media_object.date_modified = (
-            datetime.fromisoformat(serialized_data["date_modified"])
-            if serialized_data["date_modified"]
+        media_object.metadata["date_modified"] = (
+            datetime.fromisoformat(serialized_data["metadata"].get("date_modified"))
+            if serialized_data["metadata"].get("date_modified")
             else None
         )
         media_object.md5_hash = serialized_data["md5_hash"]
         media_object.text = serialized_data["text"]
-        media_object.processed_text = serialized_data.get("text_processed", [])
+        media_object.processed_text = serialized_data.get("processed_text", [])
         if hasattr(media_object, "transcripts"):
             media_object.transcripts = serialized_data["transcripts"]
         return media_object
