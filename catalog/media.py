@@ -29,7 +29,7 @@ def can_transcribe(cls):
 class MediaObject(ABC):
     def __init__(self, file_path=None, url=None, name=None, source_filename=None):
         self.id = str(uuid.uuid4())
-        self.file_path = file_path
+        self.file_path = os.path.abspath(file_path) if file_path else None
         self.text = ""
         self.processed_text = []
         self.metadata = {
@@ -37,13 +37,13 @@ class MediaObject(ABC):
             "url": url,
             "date_created": None,
             "date_modified": None,
-            "source_filename": source_filename or os.path.basename(file_path)
-            if file_path
+            "source_filename": source_filename or os.path.basename(self.file_path)
+            if self.file_path
             else None,
         }
 
-        if file_path:
-            self.import_file(file_path)
+        if self.file_path:
+            self.import_file(self.file_path)
         elif url:
             self.import_url(url)
 
