@@ -18,6 +18,11 @@ def cli():
     help="Path to library file (default: ~/.config/catalog/library.json).",
 )
 @click.option(
+    "--datastore",
+    default="~/.local/share/catalog/datastore",
+    help="Path to data directory (for copying imported files, default: ~/.local/share/catalog/datastore).",
+)
+@click.option(
     "--model",
     default="large-v2",
     help="Whisper model to use, e.g., 'large-v2' (default), 'large-v3'.",
@@ -27,6 +32,11 @@ def cli():
 @click.option("--speaker-count", type=int, help="Number of speakers for diarization.")
 @click.option("--device-index", type=int, default=0)
 @click.option(
+    "--no-copy",
+    is_flag=True,
+    help="Do not copy imported files to the data directory when importing.",
+)
+@click.option(
     "--force",
     is_flag=True,
     help="Do not prompt for confirmation before transcribing media which already has transcripts.",
@@ -34,32 +44,36 @@ def cli():
 def transcribe_command(
     query,
     library,
+    datastore,
     diarize,
     speaker_count,
     model,
     prompt,
     device_index,
+    no_copy,
     force,
 ):
     """Transcribe media objects."""
     library_path = os.path.expanduser(library)
-    library = Library(library_path)
+    datastore_path = os.path.expanduser(datastore)
+    library = Library(library_path, datastore_path)
 
     media_objects = []
     for item in query:
         if os.path.isfile(item):
             try:
-                media_object = library.import_media_object(item, auto=True)
+                media_object = library.import_media_object(
+                    item, auto=True, make_copy=not no_copy
+                )
                 media_objects.append(media_object)
             except ValueError as e:
-                click.echo(f"Error importing file {item}: {str(e)}")
+                click.echo(f"Error handling file {item}: {str(e)}")
         else:
             media_objects.extend(
                 library.fetch(
                     ids=[item],
                 )
             )
-    click.echo(f"Imported/queried media objects: {len(media_objects)}")
 
     transcribe_queue = [obj for obj in media_objects if media_object.can_transcribe()]
     click.echo(f"Media objects to transcribe: {len(transcribe_queue)}")

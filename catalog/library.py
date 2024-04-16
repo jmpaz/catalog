@@ -1,5 +1,6 @@
 import os
 import sys
+import shutil
 import json
 import hashlib
 from datetime import datetime
@@ -7,13 +8,24 @@ from catalog.media import MediaObject
 
 
 class Library:
-    def __init__(self, library_path="~/.config/catalog/library.json"):
+    def __init__(
+        self,
+        library_path="~/.config/catalog/library.json",
+        datastore_path="~/.local/share/catalog/data",
+    ):
         self.library_path = os.path.expanduser(library_path)
+        self.datastore_path = os.path.expanduser(datastore_path)
         self.media_objects = []
         self.load_library()
 
     def import_media_object(
-        self, file_path=None, media_object_class=None, name=None, url=None, auto=False
+        self,
+        file_path=None,
+        media_object_class=None,
+        name=None,
+        url=None,
+        auto=False,
+        make_copy=True,
     ):
         if auto:
             ext_map = {
@@ -40,8 +52,21 @@ class Library:
                 )
                 return existing_object
 
-            media_object = media_object_class(file_path=file_path, url=url, name=name)
+            source_filename = os.path.basename(file_path) if file_path else None
+            media_object = media_object_class(
+                file_path=file_path, url=url, name=name, source_filename=source_filename
+            )
             media_object.md5_hash = md5_hash
+
+            if make_copy and file_path:  # make a copy of the file in the datastore
+                os.makedirs(self.datastore_path, exist_ok=True)
+                file_ext = os.path.splitext(file_path)[1]
+                target_path = os.path.join(
+                    self.datastore_path, f"{media_object.id}{file_ext}"
+                )
+                shutil.copy2(file_path, target_path)
+                media_object.file_path = target_path
+
             self.media_objects.append(media_object)
             self.save_library()
             return media_object

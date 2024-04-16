@@ -124,9 +124,35 @@ class MediaObject(ABC):
         self.processed_text.append(entry)
 
 
+class Image(MediaObject):
+    def __init__(self, file_path=None, url=None, name=None, source_filename=None):
+        super().__init__(file_path, url, name)
+
+    def process(self):
+        print("Processing generic image")
+
+
+class Screenshot(Image):
+    def __init__(self, file_path=None, url=None, name=None, source_filename=None):
+        super().__init__(file_path, url, name)
+
+    def process(self):
+        print("Processing screenshot")
+
+
+@can_transcribe
+class Video(MediaObject):
+    def __init__(self, file_path=None, url=None, name=None, source_filename=None):
+        super().__init__(file_path, url, name)
+        self.transcripts = []
+
+    def process(self):
+        print("Processing generic video")
+
+
 @can_transcribe
 class Audio(MediaObject):
-    def __init__(self, file_path=None, url=None, name=None):
+    def __init__(self, file_path=None, url=None, name=None, source_filename=None):
         super().__init__(file_path, url, name)
         self.transcripts = []
 
@@ -135,58 +161,8 @@ class Audio(MediaObject):
 
 
 class Voice(Audio):
-    def __init__(self, file_path=None, url=None, name=None):
+    def __init__(self, file_path=None, url=None, name=None, source_filename=None):
         super().__init__(file_path, url, name)
 
     def process(self):
         print("Processing voice")
-
-
-class Music(Audio):
-    def __init__(self, file_path=None, url=None, name=None):
-        super().__init__(file_path, url, name)
-
-    def process(self):
-        print("Processing music")
-
-
-@can_transcribe
-class Video(MediaObject):
-    def __init__(self, file_path=None, url=None, name=None):
-        super().__init__(file_path, url, name)
-        self.transcripts = []
-
-    def process(self):
-        print("Processing generic video")
-
-
-class Image(MediaObject):
-    def __init__(self, file_path=None, url=None, name=None):
-        super().__init__(file_path, url, name)
-
-    def process(self):
-        print("Processing generic image")
-
-
-class Screenshot(Image):
-    def __init__(self, file_path=None, url=None, name=None):
-        super().__init__(file_path, url, name)
-
-    def process(self):
-        print("Processing screenshot")
-
-
-class Art(Image):
-    def __init__(self, file_path=None, url=None, name=None):
-        super().__init__(file_path, url, name)
-
-    def process(self):
-        print("Processing art")
-
-
-class Photo(Image):
-    def __init__(self, file_path=None, url=None, name=None):
-        super().__init__(file_path, url, name)
-
-    def process(self):
-        print("Processing photo")
