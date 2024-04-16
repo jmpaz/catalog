@@ -37,10 +37,14 @@ class MediaObject(ABC):
             "url": url,
             "date_created": None,
             "date_modified": None,
+            "date_stored": None,
             "source_filename": source_filename or os.path.basename(self.file_path)
             if self.file_path
             else None,
         }
+
+        if not self.metadata["date_stored"]:
+            self.metadata["date_stored"] = datetime.now().isoformat()
 
         if self.file_path:
             self.import_file(self.file_path)

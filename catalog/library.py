@@ -190,6 +190,7 @@ tags:
                 "date_modified": media_object.metadata.get("date_modified").isoformat()
                 if media_object.metadata.get("date_modified")
                 else None,
+                "date_stored": media_object.metadata.get("date_stored"),
                 "source_filename": media_object.metadata.get("source_filename"),
             },
             "file_path": media_object.file_path,
@@ -234,6 +235,9 @@ tags:
             datetime.fromisoformat(serialized_data["metadata"].get("date_modified"))
             if serialized_data["metadata"].get("date_modified")
             else None
+        )
+        media_object.metadata["date_stored"] = serialized_data["metadata"].get(
+            "date_stored"
         )
         media_object.md5_hash = serialized_data["md5_hash"]
         media_object.text = serialized_data["text"]
