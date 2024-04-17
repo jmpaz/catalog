@@ -5,6 +5,7 @@ import json
 import hashlib
 from datetime import datetime
 from catalog.media import MediaObject
+from contextualize.tokenize import call_tiktoken
 
 
 class Library:
@@ -111,34 +112,55 @@ class Library:
         with open(self.library_path, "w") as file:
             json.dump(library_data, file, indent=2)
 
-    def query(self, media_objects=None):
-        if media_objects is None:
-            raise ValueError("No MediaObjects provided")
-        elif not isinstance(media_objects, list):
-            media_objects = [media_objects]
+    def query(self, media_object):
+        if not isinstance(media_object, MediaObject):
+            raise ValueError("Invalid media object")
 
-        for media_object in media_objects:
-            # print object attributes
-            for attr, value in media_object.__dict__.items():
-                if (
-                    not attr.startswith("_")
-                    and not callable(value)
-                    and value is not None
-                    and (not isinstance(value, (list, str)) or value)
-                ):
-                    if attr == "file_content":
-                        print(f"{attr}: (exists)")
-                    else:
-                        print(f"{attr}: {value}")
+        output = []
+        output.append(f"id: {media_object.id}")
 
-            print()  # newline
+        name = media_object.metadata.get("name")
+        if name:
+            output.append(f"name: {name}")
+
+        output.append(f"object_class: {media_object.__class__.__name__}")
+
+        for date_key in ["date_stored", "date_created", "date_modified"]:
+            date_value = media_object.metadata.get(date_key)
+            if date_value:
+                output.append(f"{date_key}: {date_value}")
+
+        source_filename = media_object.metadata.get("source_filename")
+        if source_filename:
+            output.append(f"source_filename: {source_filename}")
+
+        if media_object.file_path:
+            output.append(f"file_path: {media_object.file_path}")
+
+        if media_object.text:
+            token_count = call_tiktoken(media_object.text)["count"]
+            output.append(f"text: Exists ({token_count} tokens)")
+
+        if media_object.processed_text:
+            output.append(f"processed_text: {len(media_object.processed_text)} entries")
+
+        if hasattr(media_object, "transcripts"):
+            output.append(f"transcripts: {len(media_object.transcripts)} entries")
+
+        return "\n".join(output)
 
     def fetch(self, ids=None):
         """Fetch media objects by ID."""
         output = []
 
         if ids:
-            output.extend([obj for obj in self.media_objects if obj.id[:5] in ids])
+            for id in ids:
+                for obj in self.media_objects:
+                    if obj.id.startswith(id):
+                        output.append(obj)
+                        break
+                else:
+                    raise ValueError(f"No media object found with ID: {id}")
 
         return output
 
@@ -223,7 +245,6 @@ tags:
             file_path=serialized_data["file_path"],
             url=serialized_data["metadata"].get("url"),
             name=serialized_data["metadata"].get("name"),
-            # source_filename=serialized_data["metadata"].get("source_filename"),  # handled in MediaObject constructor
         )
         media_object.id = serialized_data["id"]
         media_object.metadata["date_created"] = (
@@ -238,6 +259,9 @@ tags:
         )
         media_object.metadata["date_stored"] = serialized_data["metadata"].get(
             "date_stored"
+        )
+        media_object.metadata["source_filename"] = serialized_data["metadata"].get(
+            "source_filename"
         )
         media_object.md5_hash = serialized_data["md5_hash"]
         media_object.text = serialized_data["text"]

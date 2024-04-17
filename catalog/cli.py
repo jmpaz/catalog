@@ -1,5 +1,6 @@
 import os
 import click
+import pyperclip
 from catalog import Library
 from catalog.process import transcribe
 from contextualize.tokenize import call_tiktoken
@@ -8,6 +9,89 @@ from contextualize.tokenize import call_tiktoken
 @click.group()
 def cli():
     pass
+
+
+@click.command("query")
+@click.argument("target")
+@click.argument("subtarget", required=False)
+@click.option(
+    "--library",
+    default="~/.config/catalog/library.json",
+    help="Path to library file (default: ~/.config/catalog/library.json).",
+)
+@click.option(
+    "--output",
+    type=click.Choice(["console", "file", "clipboard"]),
+    default="console",
+    help="Output destination (default: console).",
+)
+@click.option(
+    "--output-file",
+    type=click.Path(writable=True),
+    help="Output file path (required when --output is 'file').",
+)
+@click.option(
+    "--list-properties",
+    is_flag=True,
+    help="List queryable properties for the target object.",
+)
+def query_command(target, subtarget, library, output, output_file, list_properties):
+    """Query media objects."""
+    library_path = os.path.expanduser(library)
+    library = Library(library_path)
+
+    media_object = library.fetch(ids=[target])[0] if target else None
+
+    if not media_object:
+        click.echo(f"No media object found with ID: {target}")
+        return
+
+    if list_properties:
+        subtargets = get_subtargets(media_object)
+        click.echo("Available subtargets:")
+        click.echo("\n".join(subtargets))
+        return
+
+    if subtarget:
+        if subtarget in media_object.metadata:
+            query_result = media_object.metadata.get(subtarget)
+        else:
+            query_result = getattr(media_object, subtarget, None)
+            if query_result is None:
+                click.echo(f"Invalid subtarget: {subtarget}")
+                return
+    else:
+        query_result = library.query(media_object)
+
+    if output == "console":
+        click.echo(query_result)
+    elif output == "clipboard":
+        pyperclip.copy(str(query_result))
+        token_count = call_tiktoken(str(query_result))["count"]
+        click.echo(f"Copied {token_count} tokens to clipboard.")
+    elif output == "file":
+        if not output_file:
+            click.echo("Output file path is required when --output is 'file'.")
+            return
+        with open(output_file, "w") as file:
+            file.write(str(query_result))
+        token_count = call_tiktoken(str(query_result))["count"]
+        click.echo(f"Wrote {token_count} tokens to {output_file}.")
+
+
+def get_subtargets(media_object):
+    from catalog.media import MediaObject
+
+    if not isinstance(media_object, MediaObject):
+        raise ValueError("Invalid media object")
+
+    subtargets = []
+    for attr in dir(media_object):
+        if not attr.startswith("_") and not callable(getattr(media_object, attr)):
+            subtargets.append(attr)
+    for key in media_object.metadata:
+        subtargets.append(key)
+    return subtargets
 
 
 @click.command("transcribe")
@@ -123,4 +207,5 @@ def transcribe_command(
         click.echo(f"Error saving library: {str(e)}")
 
 
+cli.add_command(query_command)
 cli.add_command(transcribe_command)
