@@ -46,18 +46,21 @@ class Library:
 
         if media_object_class and issubclass(media_object_class, MediaObject):
             md5_hash = self.compute_md5_hash(file_path)
-            existing_object = self.fetch_object_by_hash(md5_hash)
-            if existing_object:
-                print(
-                    f"Media object with hash {md5_hash} already exists. Returning the existing object."
-                )
-                return existing_object
 
             source_filename = os.path.basename(file_path) if file_path else None
             media_object = media_object_class(
                 file_path=file_path, url=url, name=name, source_filename=source_filename
             )
             media_object.md5_hash = md5_hash
+
+            existing_object = self.fetch_object_by_hash(md5_hash)
+            if existing_object:
+                print(
+                    f"Media object with hash {md5_hash} already exists. Returning the existing object."
+                )
+                return existing_object
+            else:
+                self.media_objects.append(media_object)
 
             if make_copy and file_path:  # make a copy of the file in the datastore
                 os.makedirs(self.datastore_path, exist_ok=True)
@@ -68,7 +71,6 @@ class Library:
                 shutil.copy2(file_path, target_path)
                 media_object.file_path = target_path
 
-            self.media_objects.append(media_object)
             self.save_library()
             return media_object
         else:

@@ -1,4 +1,5 @@
 import os
+import sys
 import click
 import pyperclip
 from catalog import Library
@@ -203,5 +204,112 @@ def transcribe_command(
         click.echo(f"Error saving library: {str(e)}")
 
 
+@click.command("import")
+@click.argument("path", nargs=-1)
+@click.option(
+    "--library",
+    default="~/.config/catalog/library.json",
+    help="Path to library file (default: ~/.config/catalog/library.json).",
+)
+@click.option(
+    "--datastore",
+    default="~/.local/share/catalog/datastore",
+    help="Path to data directory (for copying imported files, default: ~/.local/share/catalog/datastore).",
+)
+@click.option(
+    "--class",
+    "media_class",
+    type=click.Choice(["Audio", "Voice", "Video", "Image", "Screenshot"]),
+    help="Specify the MediaObject class for the imported file(s).",
+)
+@click.option(
+    "--no-copy",
+    is_flag=True,
+    help="Do not copy imported files to the data directory when importing.",
+)
+def import_command(path, library, datastore, media_class, no_copy):
+    """Import media files or URLs."""
+    library_path = os.path.expanduser(library)
+    datastore_path = os.path.expanduser(datastore)
+    library = Library(library_path, datastore_path)
+
+    initial_media_objects = library.media_objects.copy()
+    imported_objects = []
+
+    for item in path:
+        if os.path.isfile(item) or item.startswith(("http://", "https://")):
+            try:
+                media_object_class = (
+                    getattr(sys.modules["catalog.media"], media_class)
+                    if media_class
+                    else None
+                )
+                media_object = library.import_media_object(
+                    item,
+                    media_object_class=media_object_class,
+                    auto=not media_class,
+                    make_copy=not no_copy,
+                )
+                if media_object not in initial_media_objects:
+                    imported_objects.append(media_object)
+                    click.echo(
+                        f"Imported {media_object.id[:5]} ({media_object.__class__.__name__})"
+                    )
+                else:
+                    click.echo(
+                        f"Found existing object {media_object.id[:5]} ({media_object.__class__.__name__})"
+                    )
+            except ValueError as e:
+                click.echo(f"Error importing {item}: {str(e)}")
+        else:
+            click.echo(f"Skipping {item} (not a file or URL)")
+
+    if imported_objects:
+        try:
+            library.save_library()
+            click.echo(f"Changes saved to {library_path}.")
+        except Exception as e:
+            click.echo(f"Error saving library: {str(e)}")
+
+
+@click.command("store")
+@click.argument("id")
+@click.argument("text", type=click.File("r"))
+@click.option(
+    "--library",
+    default="~/.config/catalog/library.json",
+    help="Path to library file (default: ~/.config/catalog/library.json).",
+)
+@click.option("--source", help="Source of the processed text.")
+@click.option("--label", help="Label for the processed text entry.")
+def store_command(id, text, library, source, label):
+    """Store processed text for a media object."""
+    library_path = os.path.expanduser(library)
+    library = Library(library_path)
+
+    media_objects = prepare_objects(library, [id])
+
+    if not media_objects:
+        click.echo(f"No media object found with ID: {id}")
+        return
+
+    media_object = media_objects[0]
+    processed_text = text.read().strip()
+
+    try:
+        media_object.store_processed_text(processed_text, source=source, label=label)
+        click.echo(f"Stored processed text for {media_object.id[:5]}")
+    except ValueError as e:
+        click.echo(f"Error storing processed text: {str(e)}")
+
+    try:
+        library.save_library()
+        click.echo(f"Changes saved to {library_path}.")
+    except Exception as e:
+        click.echo(f"Error saving library: {str(e)}")
+
+
 cli.add_command(query_command)
 cli.add_command(transcribe_command)
+cli.add_command(import_command)
+cli.add_command(store_command)
