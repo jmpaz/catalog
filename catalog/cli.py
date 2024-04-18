@@ -6,6 +6,20 @@ from catalog.process import transcribe
 from contextualize.tokenize import call_tiktoken
 
 
+def prepare_objects(library, query):
+    media_objects = []
+    for item in query:
+        if os.path.isfile(item):
+            try:
+                media_object = library.import_media_object(item, auto=True)
+                media_objects.append(media_object)
+            except ValueError as e:
+                click.echo(f"Error handling file {item}: {str(e)}")
+        else:
+            media_objects.extend(library.fetch(ids=[item]))
+    return media_objects
+
+
 @click.group()
 def cli():
     pass
@@ -40,11 +54,13 @@ def query_command(target, subtarget, library, output, output_file, list_properti
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
-    media_object = library.fetch(ids=[target])[0] if target else None
+    media_objects = prepare_objects(library, [target])
 
-    if not media_object:
+    if not media_objects:
         click.echo(f"No media object found with ID: {target}")
         return
+
+    media_object = media_objects[0]
 
     if list_properties:
         subtargets = get_subtargets(media_object)
@@ -142,31 +158,11 @@ def transcribe_command(
     datastore_path = os.path.expanduser(datastore)
     library = Library(library_path, datastore_path)
 
-    media_objects = []
-    for item in query:
-        if os.path.isfile(item):
-            try:
-                media_object = library.import_media_object(
-                    item, auto=True, make_copy=not no_copy
-                )
-                media_objects.append(media_object)
-            except ValueError as e:
-                click.echo(f"Error handling file {item}: {str(e)}")
-        else:
-            media_objects.extend(
-                library.fetch(
-                    ids=[item],
-                )
-            )
-
-    transcribe_queue = [obj for obj in media_objects if media_object.can_transcribe()]
+    media_objects = prepare_objects(library, query)
+    transcribe_queue = [obj for obj in media_objects if obj.can_transcribe()]
     click.echo(f"Media objects to transcribe: {len(transcribe_queue)}")
 
     for media_object in transcribe_queue:
-        if not media_object.can_transcribe():
-            click.echo(f"Skipping {media_object.id[:5]} as it is not transcribable.")
-            continue
-
         if not force and media_object.transcripts:
             num_transcripts = len(media_object.transcripts)
             if not click.confirm(
