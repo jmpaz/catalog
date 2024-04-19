@@ -46,7 +46,8 @@ def cli():
     help="Output file path (required when --output is 'file').",
 )
 @click.option(
-    "--list-properties",
+    "--properties",
+    "list_properties",
     is_flag=True,
     help="List queryable properties for the target object.",
 )
@@ -65,7 +66,9 @@ def query_command(target, subtarget, library, output, output_file, list_properti
 
     if list_properties:
         subtargets = get_subtargets(media_object)
-        click.echo("Available subtargets:")
+        click.echo(
+            f"Queryable properties for {media_object.id[:5]} ({media_object.__class__.__name__}):"
+        )
         click.echo("\n".join(subtargets))
         return
 
@@ -154,7 +157,7 @@ def transcribe_command(
     no_copy,
     force,
 ):
-    """Transcribe media objects."""
+    """Transcribe compatible media objects."""
     library_path = os.path.expanduser(library)
     datastore_path = os.path.expanduser(datastore)
     library = Library(library_path, datastore_path)
