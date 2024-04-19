@@ -2,6 +2,9 @@ import os
 import sys
 import click
 import pyperclip
+import datetime
+from rich.console import Console
+from rich.table import Table
 from catalog import Library
 from catalog.process import transcribe
 from contextualize.tokenize import call_tiktoken
@@ -312,7 +315,90 @@ def store_command(id, text, library, source, label):
         click.echo(f"Error saving library: {str(e)}")
 
 
+@click.command("ls")
+@click.option(
+    "--library",
+    default="~/.config/catalog/library.json",
+    help="Path to library file (default: ~/.config/catalog/library.json).",
+)
+@click.option(
+    "--sort",
+    type=click.Choice(
+        [
+            "date",
+            "date-asc",
+            "transcripts",
+            "transcripts-asc",
+            "tokens",
+            "tokens-asc",
+        ],
+        case_sensitive=False,
+    ),
+    default="date",
+    help="Sort media objects by the specified criteria.",
+)
+@click.option("--page", is_flag=True, help="Display results in a pager.")
+def ls_command(library, sort, page):
+    """List media objects in a formatted table."""
+    library_path = os.path.expanduser(library)
+    library = Library(library_path)
+
+    media_objects = library.media_objects
+
+    sort_keys = {
+        "date": lambda obj: getattr(obj, "metadata", {}).get(
+            "date_modified", obj.metadata.get("date_created")
+        ),
+        "date-asc": lambda obj: getattr(obj, "metadata", {}).get(
+            "date_modified", obj.metadata.get("date_created", datetime.min)
+        ),
+        "transcripts": lambda obj: -len(getattr(obj, "transcripts", [])),
+        "transcripts-asc": lambda obj: len(getattr(obj, "transcripts", [])),
+        "tokens": lambda obj: -getattr(obj, "metadata", {}).get("token_count", 0),
+        "tokens-asc": lambda obj: getattr(obj, "metadata", {}).get("token_count", 0),
+    }
+
+    media_objects.sort(key=sort_keys[sort])
+
+    table = Table()
+    table.add_column("ID", no_wrap=True)
+    table.add_column("Filename")
+    table.add_column("Name")
+    table.add_column("Class")
+    table.add_column("Date Created", justify="right")
+    table.add_column("Date Modified", justify="right")
+    table.add_column("Transcripts", justify="right")
+
+    for obj in media_objects:
+        created = obj.metadata.get("date_created", "")
+        modified = obj.metadata.get("date_modified", "")
+        transcripts_count = len(getattr(obj, "transcripts", []))
+
+        if isinstance(created, datetime.datetime):
+            created = created.strftime("%Y-%m-%d %H:%M:%S")
+        if isinstance(modified, datetime.datetime):
+            modified = modified.strftime("%Y-%m-%d %H:%M:%S")
+
+        table.add_row(
+            obj.id[:7],
+            obj.metadata.get("source_filename", ""),
+            obj.metadata.get("name", ""),
+            obj.__class__.__name__,
+            created,
+            modified,
+            str(transcripts_count),
+        )
+
+    console = Console()
+    if page:
+        with console.pager():
+            console.print(table)
+    else:
+        console.print(table)
+
+
 cli.add_command(query_command)
 cli.add_command(transcribe_command)
 cli.add_command(import_command)
 cli.add_command(store_command)
+cli.add_command(ls_command)
