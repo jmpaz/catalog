@@ -3,6 +3,7 @@ import sys
 import shutil
 import json
 import hashlib
+import send2trash
 from datetime import datetime
 from catalog.media import MediaObject
 from contextualize.tokenize import call_tiktoken
@@ -75,6 +76,13 @@ class Library:
             return media_object
         else:
             raise ValueError("media_object_class must be a subclass of MediaObject")
+
+    def remove_media_object(self, media_object, delete_file=False):
+        self.media_objects = [
+            obj for obj in self.media_objects if obj.id != media_object.id
+        ]
+        if delete_file and media_object.file_path:
+            send2trash(media_object.file_path)
 
     def compute_md5_hash(self, file_path):
         if file_path and os.path.isfile(file_path):
@@ -165,6 +173,24 @@ class Library:
                     raise ValueError(f"No media object found with ID: {id}")
 
         return output
+
+    def fetch_entry(self, media_object_id, entry_type, entry_id):
+        """Fetch a specific entry from a media object."""
+        media_object = next(
+            (obj for obj in self.media_objects if obj.id.startswith(media_object_id)),
+            None,
+        )
+        if media_object:
+            entries = getattr(media_object, entry_type, [])
+            entry = next((e for e in entries if e["id"].startswith(entry_id)), None)
+            if entry:
+                return media_object, entry
+            else:
+                raise ValueError(
+                    f"No {entry_type[:-1]} entry found with ID: {entry_id}"
+                )
+        else:
+            raise ValueError(f"No media object found with ID: {media_object_id}")
 
     def _print_value(self, value, indent=2):
         if isinstance(value, dict):

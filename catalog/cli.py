@@ -397,8 +397,66 @@ def ls_command(library, sort, page):
         console.print(table)
 
 
+@click.command(
+    "rm",
+    help="Remove media objects or supported entries from media objects. "
+    "Use SUBTARGET in the format 'type:entry_id' to specify a specific entry to remove, "
+    "e.g., 'transcripts:a750f', 'processed_text:fe2f9'.",
+)
+@click.argument("target")
+@click.argument("subtarget", required=False)
+@click.option(
+    "--library",
+    default="~/.config/catalog/library.json",
+    help="Path to library file (default: ~/.config/catalog/library.json).",
+)
+@click.option(
+    "--delete-file",
+    is_flag=True,
+    help="Delete the associated file from the datastore.",
+)
+def rm_command(target, subtarget, library, delete_file):
+    library_path = os.path.expanduser(library)
+    library = Library(library_path)
+
+    try:
+        if subtarget:
+            type_id, entry_id = subtarget.split(":", 1)
+            if type_id not in ["transcripts", "processed_text"]:
+                click.echo(f"Invalid subtarget: {subtarget}")
+                return
+            media_object, entry = library.fetch_entry(target, type_id, entry_id)
+            message = f"Delete {type_id} entry {entry['id']} from '{media_object.id}'?"
+        else:
+            media_object = library.fetch([target])[0]
+            message = f"Delete the entire media object '{media_object.id}'?"
+            if delete_file:
+                message += (
+                    " This will also delete the associated file from the datastore."
+                )
+
+        if click.confirm(message, abort=True):
+            if subtarget:
+                media_object.remove_entry(type_id, entry_id)
+                click.echo(
+                    f"Removed {type_id} entry {entry['id']} from '{media_object.id}'"
+                )
+            else:
+                library.remove_media_object(media_object, delete_file=delete_file)
+                click.echo(f"Removed media object '{media_object.id}'")
+
+            library.save_library()
+            click.echo(f"Changes saved to {library_path}.")
+
+    except ValueError as e:
+        click.echo(str(e))
+    except Exception as e:
+        click.echo(f"Error saving library: {str(e)}")
+
+
 cli.add_command(query_command)
 cli.add_command(transcribe_command)
 cli.add_command(add_command)
 cli.add_command(store_command)
 cli.add_command(ls_command)
+cli.add_command(rm_command)

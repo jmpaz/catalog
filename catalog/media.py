@@ -73,6 +73,32 @@ class MediaObject(ABC):
                 )
                 self.file_path = path
 
+    def remove_entry(self, entry_type, entry_id):
+        if entry_type == "transcripts":
+            original_length = len(self.transcripts)
+            self.transcripts = [
+                entry
+                for entry in self.transcripts
+                if not entry["id"].startswith(entry_id)
+            ]
+            if original_length == len(self.transcripts):
+                raise ValueError(
+                    f"No transcript entry found with ID starting with: {entry_id}"
+                )
+        elif entry_type == "processed_text":
+            original_length = len(self.processed_text)
+            self.processed_text = [
+                entry
+                for entry in self.processed_text
+                if not entry["id"].startswith(entry_id)
+            ]
+            if original_length == len(self.processed_text):
+                raise ValueError(
+                    f"No processed text entry found with ID starting with: {entry_id}"
+                )
+        else:
+            raise ValueError(f"Invalid entry type: {entry_type}")
+
     def get_delimited_text(self, format="md"):
         """
         Delimit the object's text content in the specified format.
