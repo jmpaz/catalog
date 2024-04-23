@@ -210,7 +210,7 @@ def transcribe_command(
         click.echo(f"Error saving library: {str(e)}")
 
 
-@click.command("import")
+@click.command("add")
 @click.argument("path", nargs=-1)
 @click.option(
     "--library",
@@ -233,7 +233,7 @@ def transcribe_command(
     is_flag=True,
     help="Do not copy imported files to the data directory when importing.",
 )
-def import_command(path, library, datastore, media_class, no_copy):
+def add_command(path, library, datastore, media_class, no_copy):
     """Import media files or URLs."""
     library_path = os.path.expanduser(library)
     datastore_path = os.path.expanduser(datastore)
@@ -399,6 +399,6 @@ def ls_command(library, sort, page):
 
 cli.add_command(query_command)
 cli.add_command(transcribe_command)
-cli.add_command(import_command)
+cli.add_command(add_command)
 cli.add_command(store_command)
 cli.add_command(ls_command)
