@@ -3,7 +3,7 @@ import sys
 import shutil
 import json
 import hashlib
-import send2trash
+from send2trash import send2trash
 from datetime import datetime
 from catalog.media import MediaObject
 from contextualize.tokenize import call_tiktoken
