@@ -399,12 +399,10 @@ def ls_command(library, sort, page):
 
 @click.command(
     "rm",
-    help="Remove media objects or supported entries from media objects. "
-    "Use SUBTARGET in the format 'type:entry_id' to specify a specific entry to remove, "
-    "e.g., 'transcripts:a750f', 'processed_text:fe2f9'.",
+    help="Remove media objects or specified entries by full or partial ID. "
+    "Format: 'media_id[:type_id:entry_id]' (e.g. 'rm 65317 b3ab4', 'rm b3ab4:transcripts:6e2')",
 )
-@click.argument("target")
-@click.argument("subtarget", required=False)
+@click.argument("targets", nargs=-1)
 @click.option(
     "--library",
     default="~/.config/catalog/library.json",
@@ -412,41 +410,51 @@ def ls_command(library, sort, page):
 )
 @click.option(
     "--delete-file",
+    "-D",
     is_flag=True,
-    help="Delete the associated file from the datastore.",
+    help="Delete the associated file(s) from the datastore.",
 )
-def rm_command(target, subtarget, library, delete_file):
+def rm_command(targets, library, delete_file):
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
     try:
-        if subtarget:
-            type_id, entry_id = subtarget.split(":", 1)
-            if type_id not in ["transcripts", "processed_text"]:
-                click.echo(f"Invalid subtarget: {subtarget}")
-                return
-            media_object, entry = library.fetch_entry(target, type_id, entry_id)
-            message = f"Delete {type_id} entry {entry['id']} from '{media_object.id}'?"
-        else:
-            media_object = library.fetch([target])[0]
-            message = f"Delete the entire media object '{media_object.id}'?"
-            if delete_file:
-                message += (
-                    " This will also delete the associated file from the datastore."
-                )
+        for target in targets:
+            parts = target.split(":")
+            media_id = parts[0]
+            if len(parts) == 1:
+                # delete entire media object
+                media_object = library.fetch([media_id])[0]
+                message = f"Delete the entire media object '{media_object.id}'?"
+                if delete_file:
+                    message += (
+                        " This will also delete the associated file from the datastore."
+                    )
+                if click.confirm(message, abort=True):
+                    library.remove_media_object(media_object, delete_file=delete_file)
+                    click.echo(f"Removed media object '{media_object.id}'")
+            elif len(parts) == 2:
+                # delete all entries of a specific type
+                raise ValueError("not yet implemented")
+            elif len(parts) == 3:
+                # delete specific entry
+                type_id, entry_id = parts[1], parts[2]
+                if type_id in ["transcripts", "processed_text"]:
+                    media_object, entry = library.fetch_entry(
+                        media_id, type_id, entry_id
+                    )
+                    full_entry_id = entry["id"]
+                    if click.confirm(
+                        f"Delete {type_id} entry {full_entry_id} from '{media_object.id}'?",
+                        abort=True,
+                    ):
+                        media_object.remove_entry(type_id, entry_id)
+                        click.echo(
+                            f"Removed {type_id} entry {full_entry_id} from '{media_object.id}'"
+                        )
 
-        if click.confirm(message, abort=True):
-            if subtarget:
-                media_object.remove_entry(type_id, entry_id)
-                click.echo(
-                    f"Removed {type_id} entry {entry['id']} from '{media_object.id}'"
-                )
-            else:
-                library.remove_media_object(media_object, delete_file=delete_file)
-                click.echo(f"Removed media object '{media_object.id}'")
-
-            library.save_library()
-            click.echo(f"Changes saved to {library_path}.")
+        library.save_library()
+        click.echo(f"Changes saved to {library_path}.")
 
     except ValueError as e:
         click.echo(str(e))
