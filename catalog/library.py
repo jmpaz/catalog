@@ -206,7 +206,9 @@ class Library:
 
     def create_pointer(self, media_object, dest_path="data/pointers"):
         id = media_object.id
-        name = media_object.name if media_object.name else None
+        name = media_object.metadata.get("name")
+        if not name:
+            name = media_object.metadata.get("source_filename", "").split(".")[0]
         obj_type = media_object.__class__.__name__
         frontmatter = f"""---
 id:
