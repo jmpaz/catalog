@@ -462,9 +462,42 @@ def rm_command(targets, library, delete_file):
         click.echo(f"Error saving library: {str(e)}")
 
 
+@click.command("md")
+@click.argument("targets", nargs=-1)
+@click.option(
+    "--library",
+    default="~/.config/catalog/library.json",
+    help="Path to library file (default: ~/.config/catalog/library.json).",
+)
+@click.option(
+    "--output-dir",
+    default=".",
+    help="Destination path for the generated pointers (default: current directory).",
+)
+def markdown_pointers_command(targets, library, dest):
+    """Create Markdown pointers composed of specified objects' metadata and `text`."""
+    library_path = os.path.expanduser(library)
+    library = Library(library_path)
+
+    if targets:
+        media_objects = prepare_objects(library, targets)
+    else:
+        media_objects = library.media_objects
+
+    for media_object in media_objects:
+        try:
+            library.create_pointer(media_object, dest_path=dest)
+            click.echo(
+                f"Created pointer for {media_object.id[:5]} ({media_object.__class__.__name__})"
+            )
+        except Exception as e:
+            click.echo(f"Error creating pointer for {media_object.id[:5]}: {str(e)}")
+
+
 cli.add_command(query_command)
 cli.add_command(transcribe_command)
 cli.add_command(add_command)
 cli.add_command(store_command)
 cli.add_command(ls_command)
 cli.add_command(rm_command)
+cli.add_command(markdown_pointers_command)
