@@ -225,7 +225,7 @@ def transcribe_command(
 @click.option(
     "--class",
     "media_class",
-    type=click.Choice(["Audio", "Voice", "Video", "Image", "Screenshot"]),
+    type=click.Choice(["Audio", "Voice", "Video", "Image", "Screenshot", "Chat"]),
     help="Specify the MediaObject class for the imported file(s).",
 )
 @click.option(

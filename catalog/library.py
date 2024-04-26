@@ -1,4 +1,5 @@
 import os
+import yaml
 import sys
 import shutil
 import json
@@ -29,6 +30,58 @@ class Library:
         auto=False,
         make_copy=True,
     ):
+        def _handle_chat():
+            from catalog.media import Chat
+
+            if media_object_class == Chat and file_path.lower().endswith(
+                (".yaml", ".yml")
+            ):
+                metadata, participants, messages = _import_chat(file_path)
+                media_object = Chat(
+                    file_path=file_path,
+                    name=name,
+                    metadata=metadata,
+                    participants=participants,
+                    messages=messages,
+                    source_filename=os.path.basename(file_path),
+                )
+                media_object.md5_hash = self.compute_md5_hash(file_path)
+
+                existing_object = self.fetch_object_by_hash(media_object.md5_hash)
+                if existing_object:
+                    print(
+                        f"Chat object with hash {media_object.md5_hash} already exists. Returning the existing object."
+                    )
+                    return existing_object
+                else:
+                    self.media_objects.append(media_object)
+
+                self.save_library()
+                return media_object
+
+        def _import_chat(yaml_file):
+            """Prepare chat data for storage."""
+            with open(yaml_file, "r") as file:
+                data = yaml.safe_load(file)
+
+            excerpt_data = data["excerpt"]
+            chat_metadata = next(item["meta"] for item in excerpt_data)
+            participants = next(
+                item["participants"] for item in excerpt_data if "participants" in item
+            )
+            messages = next(
+                item["messages"] for item in excerpt_data if "messages" in item
+            )
+
+            # store participants as a dict of 'name': 'id' pairs
+            participants = {
+                list(p.keys())[0]: list(p.values())[0] for p in participants
+            }
+
+            return chat_metadata, participants, messages
+
+        _handle_chat()
+
         if auto:
             ext_map = {
                 "Voice": [".mp3", ".wav", ".flac", ".m4a", ".ogg"],
@@ -236,12 +289,16 @@ tags:
             "metadata": {
                 "name": media_object.metadata.get("name"),
                 "url": media_object.metadata.get("url"),
-                "date_created": media_object.metadata.get("date_created").isoformat()
-                if media_object.metadata.get("date_created")
-                else None,
-                "date_modified": media_object.metadata.get("date_modified").isoformat()
-                if media_object.metadata.get("date_modified")
-                else None,
+                "date_created": (
+                    media_object.metadata.get("date_created").isoformat()
+                    if isinstance(media_object.metadata.get("date_created"), datetime)
+                    else media_object.metadata.get("date_created")
+                ),
+                "date_modified": (
+                    media_object.metadata.get("date_modified").isoformat()
+                    if isinstance(media_object.metadata.get("date_modified"), datetime)
+                    else media_object.metadata.get("date_modified")
+                ),
                 "date_stored": media_object.metadata.get("date_stored"),
                 "source_filename": media_object.metadata.get("source_filename"),
             },
@@ -249,19 +306,22 @@ tags:
             "md5_hash": media_object.md5_hash,
             "text": media_object.text,
             "processed_text": media_object.processed_text,
-            "transcripts": media_object.transcripts
-            if hasattr(media_object, "transcripts")
-            else [],
             "class_name": media_object.__class__.__name__,
             "module_name": media_object.__class__.__module__,
         }
+
+        # store attributes not already serialized
+        for attr_name in dir(media_object):
+            if not attr_name.startswith("__") and attr_name not in serialized_data:
+                attr_value = getattr(media_object, attr_name)
+                if isinstance(attr_value, (str, int, float, bool, list, dict)):
+                    serialized_data[attr_name] = attr_value
+
         return serialized_data
 
     def deserialize_object(self, serialized_data):
         class_name = serialized_data["class_name"]
-        module_name = serialized_data.get(
-            "module_name", "catalog.media"
-        )  # default to 'catalog.media' if not specified
+        module_name = serialized_data.get("module_name", "catalog.media")
 
         try:
             module = __import__(module_name, fromlist=[class_name])
@@ -271,33 +331,30 @@ tags:
                 f"Failed to import class '{class_name}' from module '{module_name}'"
             )
 
-        media_object = media_object_class(
-            file_path=serialized_data["file_path"],
-            url=serialized_data["metadata"].get("url"),
-            name=serialized_data["metadata"].get("name"),
-        )
+        media_object = media_object_class(file_path=serialized_data["file_path"])
         media_object.id = serialized_data["id"]
-        media_object.metadata["date_created"] = (
-            datetime.fromisoformat(serialized_data["metadata"].get("date_created"))
-            if serialized_data["metadata"].get("date_created")
-            else None
-        )
-        media_object.metadata["date_modified"] = (
-            datetime.fromisoformat(serialized_data["metadata"].get("date_modified"))
-            if serialized_data["metadata"].get("date_modified")
-            else None
-        )
-        media_object.metadata["date_stored"] = serialized_data["metadata"].get(
-            "date_stored"
-        )
-        media_object.metadata["source_filename"] = serialized_data["metadata"].get(
-            "source_filename"
-        )
         media_object.md5_hash = serialized_data["md5_hash"]
+
+        # set metadata
+        for key, value in serialized_data["metadata"].items():
+            if key in ["date_created", "date_modified"]:
+                media_object.metadata[key] = (
+                    datetime.fromisoformat(value)
+                    if value and isinstance(value, str)
+                    else value
+                )
+            else:
+                media_object.metadata[key] = value
+
+        # set text
         media_object.text = serialized_data["text"]
-        media_object.processed_text = serialized_data.get("processed_text", [])
-        if hasattr(media_object, "transcripts"):
-            media_object.transcripts = serialized_data["transcripts"]
+        media_object.processed_text = serialized_data["processed_text"]
+
+        # set other attributes
+        for attr_name, attr_value in serialized_data.items():
+            if hasattr(media_object, attr_name):
+                setattr(media_object, attr_name, attr_value)
+
         return media_object
 
 

@@ -129,10 +129,6 @@ class MediaObject(ABC):
         else:
             return None, None
 
-    @abstractmethod
-    def process(self):
-        pass
-
     def set_text(self):
         pass
 
@@ -158,16 +154,10 @@ class Image(MediaObject):
     def __init__(self, file_path=None, url=None, name=None, source_filename=None):
         super().__init__(file_path, url, name)
 
-    def process(self):
-        print("Processing generic image")
-
 
 class Screenshot(Image):
     def __init__(self, file_path=None, url=None, name=None, source_filename=None):
         super().__init__(file_path, url, name)
-
-    def process(self):
-        print("Processing screenshot")
 
 
 @can_transcribe
@@ -176,9 +166,6 @@ class Video(MediaObject):
         super().__init__(file_path, url, name)
         self.transcripts = []
 
-    def process(self):
-        print("Processing generic video")
-
 
 @can_transcribe
 class Audio(MediaObject):
@@ -186,13 +173,28 @@ class Audio(MediaObject):
         super().__init__(file_path, url, name)
         self.transcripts = []
 
-    def process(self):
-        print("Processing generic audio")
-
 
 class Voice(Audio):
     def __init__(self, file_path=None, url=None, name=None, source_filename=None):
         super().__init__(file_path, url, name)
 
-    def process(self):
-        print("Processing voice")
+
+class Chat(MediaObject):
+    def __init__(
+        self,
+        file_path=None,
+        url=None,
+        name=None,
+        source_filename=None,
+        metadata=None,
+        participants=None,
+        messages=None,
+    ):
+        super().__init__(file_path, url, name, source_filename)
+        self.metadata.update(
+            {item.get("key"): item.get("value") for item in metadata}
+            if metadata
+            else {}
+        )
+        self.participants = participants or []
+        self.messages = messages or []
