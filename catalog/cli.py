@@ -2,7 +2,7 @@ import os
 import sys
 import click
 import pyperclip
-import datetime
+from datetime import datetime
 from rich.console import Console
 from rich.table import Table
 from catalog import Library
@@ -345,13 +345,17 @@ def ls_command(library, sort, page):
 
     media_objects = library.media_objects
 
+    def get_date(obj, key):
+        date = getattr(obj, "metadata", {}).get(key)
+        if date:
+            return datetime.fromisoformat(date)
+        return datetime.min
+
     sort_keys = {
-        "date": lambda obj: getattr(obj, "metadata", {}).get(
-            "date_modified", obj.metadata.get("date_created")
-        ),
-        "date-asc": lambda obj: getattr(obj, "metadata", {}).get(
-            "date_modified", obj.metadata.get("date_created", datetime.min)
-        ),
+        "date": lambda obj: get_date(obj, "date_created")
+        or get_date(obj, "date_stored"),
+        "date-asc": lambda obj: get_date(obj, "date_created")
+        or get_date(obj, "date_stored"),
         "transcripts": lambda obj: -len(getattr(obj, "transcripts", [])),
         "transcripts-asc": lambda obj: len(getattr(obj, "transcripts", [])),
         "tokens": lambda obj: -getattr(obj, "metadata", {}).get("token_count", 0),
@@ -366,18 +370,18 @@ def ls_command(library, sort, page):
     table.add_column("Name")
     table.add_column("Class")
     table.add_column("Date Created", justify="right")
-    table.add_column("Date Modified", justify="right")
+    table.add_column("Date Stored", justify="right")
     table.add_column("Transcripts", justify="right")
 
     for obj in media_objects:
         created = obj.metadata.get("date_created", "")
-        modified = obj.metadata.get("date_modified", "")
+        stored = obj.metadata.get("date_stored", "")
         transcripts_count = len(getattr(obj, "transcripts", []))
 
-        if isinstance(created, datetime.datetime):
-            created = created.strftime("%Y-%m-%d %H:%M:%S")
-        if isinstance(modified, datetime.datetime):
-            modified = modified.strftime("%Y-%m-%d %H:%M:%S")
+        if created:
+            created = datetime.fromisoformat(created).strftime("%Y-%m-%d %H:%M:%S")
+        if stored:
+            stored = datetime.fromisoformat(stored).strftime("%Y-%m-%d %H:%M:%S")
 
         table.add_row(
             obj.id[:7],
@@ -385,7 +389,7 @@ def ls_command(library, sort, page):
             obj.metadata.get("name", ""),
             obj.__class__.__name__,
             created,
-            modified,
+            stored,
             str(transcripts_count),
         )
 

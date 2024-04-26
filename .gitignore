@@ -3,6 +3,7 @@ __pycache__/
 .tmp/
 
 data/
+store/
 logs/
 outputs/
 
