@@ -36,11 +36,11 @@ class Library:
             if media_object_class == Chat and file_path.lower().endswith(
                 (".yaml", ".yml")
             ):
-                metadata, participants, messages = _import_chat(file_path)
+                chat_metadata, participants, messages = _import_chat(file_path)
                 media_object = Chat(
                     file_path=file_path,
                     name=name,
-                    metadata=metadata,
+                    chat_metadata=chat_metadata,
                     participants=participants,
                     messages=messages,
                     source_filename=os.path.basename(file_path),
@@ -65,18 +65,25 @@ class Library:
                 data = yaml.safe_load(file)
 
             excerpt_data = data["excerpt"]
-            chat_metadata = next(item["meta"] for item in excerpt_data)
+
+            # store chat metadata ('meta') as a single dict of key-value pairs
+            chat_metadata = {}
+            for item in excerpt_data:
+                if "meta" in item:
+                    for key in item["meta"]:
+                        chat_metadata.update(key)
+
+            # store participants as a dict of 'name': 'id' pairs
             participants = next(
                 item["participants"] for item in excerpt_data if "participants" in item
             )
-            messages = next(
-                item["messages"] for item in excerpt_data if "messages" in item
-            )
-
-            # store participants as a dict of 'name': 'id' pairs
             participants = {
                 list(p.keys())[0]: list(p.values())[0] for p in participants
             }
+
+            messages = next(
+                item["messages"] for item in excerpt_data if "messages" in item
+            )
 
             return chat_metadata, participants, messages
 
@@ -302,6 +309,9 @@ tags:
                 "date_stored": media_object.metadata.get("date_stored"),
                 "source_filename": media_object.metadata.get("source_filename"),
             },
+            "chat_metadata": getattr(media_object, "chat_metadata", {})
+            if hasattr(media_object, "chat_metadata")
+            else {},
             "file_path": media_object.file_path,
             "md5_hash": media_object.md5_hash,
             "text": media_object.text,
@@ -345,6 +355,8 @@ tags:
                 )
             else:
                 media_object.metadata[key] = value
+        if "chat_metadata" in serialized_data:
+            media_object.chat_metadata = serialized_data["chat_metadata"]
 
         # set text
         media_object.text = serialized_data["text"]

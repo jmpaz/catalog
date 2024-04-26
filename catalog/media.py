@@ -187,6 +187,7 @@ class Chat(MediaObject):
         name=None,
         source_filename=None,
         metadata=None,
+        chat_metadata=None,
         participants=None,
         messages=None,
     ):
@@ -196,5 +197,6 @@ class Chat(MediaObject):
             if metadata
             else {}
         )
+        self.chat_metadata = chat_metadata or {}
         self.participants = participants or []
         self.messages = messages or []
