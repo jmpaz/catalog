@@ -80,6 +80,12 @@ def query_command(target, subtarget, library, output, output_file, list_properti
             query_result = media_object.metadata.get(subtarget)
         else:
             query_result = getattr(media_object, subtarget, None)
+
+            # replace transcript nodes with node count
+            if subtarget == "transcripts":
+                for transcript in query_result:
+                    transcript["nodes"] = len(transcript["nodes"])
+
             if query_result is None:
                 click.echo(f"Invalid subtarget: {subtarget}")
                 return
