@@ -364,19 +364,33 @@ def ls_command(library, sort, page):
 
     media_objects.sort(key=sort_keys[sort])
 
-    table = Table()
+    table = Table(show_lines=True)
     table.add_column("ID", no_wrap=True)
-    table.add_column("Filename")
     table.add_column("Name")
     table.add_column("Class")
+    table.add_column("People")
+    table.add_column("Segments", justify="right")
+    table.add_column("Transcripts", justify="right")
     table.add_column("Date Created", justify="right")
     table.add_column("Date Stored", justify="right")
-    table.add_column("Transcripts", justify="right")
 
     for obj in media_objects:
         created = obj.metadata.get("date_created", "")
         stored = obj.metadata.get("date_stored", "")
+        if obj.__class__.__name__ == "Chat":
+            segments_count = len(getattr(obj, "messages", []))
+        elif obj.__class__.__name__ == "Voice":
+            segments_count = 0
+            for transcript in obj.transcripts:
+                segments_count += len(transcript["nodes"])
+
         transcripts_count = len(getattr(obj, "transcripts", []))
+        people = (
+            [name for name in obj.participants]
+            if "participants" in obj.__dict__
+            else []
+        )
+        people_str = ", ".join(people)
 
         if created:
             created = datetime.fromisoformat(created).strftime("%Y-%m-%d %H:%M:%S")
@@ -384,13 +398,16 @@ def ls_command(library, sort, page):
             stored = datetime.fromisoformat(stored).strftime("%Y-%m-%d %H:%M:%S")
 
         table.add_row(
-            obj.id[:7],
-            obj.metadata.get("source_filename", ""),
-            obj.metadata.get("name", ""),
+            obj.id[:6],
+            obj.metadata.get("name", "")
+            if obj.metadata.get("name")
+            else obj.metadata.get("source_filename", ""),
             obj.__class__.__name__,
+            str(people_str),
+            str(segments_count),
+            str(transcripts_count),
             created,
             stored,
-            str(transcripts_count),
         )
 
     console = Console()
