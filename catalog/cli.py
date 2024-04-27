@@ -304,6 +304,7 @@ def store_command(id, text, library, source, label):
 
     try:
         media_object.store_processed_text(processed_text, source=source, label=label)
+        media_object.set_text()
         click.echo(f"Stored processed text for {media_object.id[:5]}")
     except ValueError as e:
         click.echo(f"Error storing processed text: {str(e)}")
