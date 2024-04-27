@@ -217,6 +217,16 @@ class Library:
         if hasattr(media_object, "transcripts"):
             output.append(f"transcripts: {len(media_object.transcripts)} entries")
 
+        if hasattr(media_object, "participants"):
+            output.append(f"participants: {len(media_object.participants)} entries")
+        if hasattr(media_object, "messages"):
+            output.append(f"messages: {len(media_object.messages)} entries")
+        if (
+            hasattr(media_object, "chat_metadata")
+            and len(media_object.chat_metadata) > 0
+        ):
+            output.append(f"chat_metadata: {len(media_object.chat_metadata)} entries")
+
         return "\n".join(output)
 
     def fetch(self, ids=None):
