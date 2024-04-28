@@ -537,7 +537,7 @@ def rm_command(targets, library, delete_file):
     default=".",
     help="Destination path for the generated pointers (default: current directory).",
 )
-def markdown_pointers_command(targets, library, dest):
+def markdown_pointers_command(targets, library, output_dir):
     """Create Markdown pointers composed of specified objects' metadata and `text`."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
@@ -549,7 +549,7 @@ def markdown_pointers_command(targets, library, dest):
 
     for media_object in media_objects:
         try:
-            library.create_pointer(media_object, dest_path=dest)
+            library.create_pointer(media_object, dest_path=output_dir)
             click.echo(
                 f"Created pointer for {media_object.id[:5]} ({media_object.__class__.__name__})"
             )
