@@ -2,6 +2,7 @@ import os
 import sys
 import click
 import pyperclip
+import tempfile
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
@@ -54,7 +55,15 @@ def cli():
     is_flag=True,
     help="List queryable properties for the target object.",
 )
-def query_command(target, subtarget, library, output, output_file, list_properties):
+@click.option(
+    "--action",
+    "-a",
+    type=click.Choice(["edit", "play"]),
+    help="Perform an action on the queried object: edit text in nvim (as tempfile) or play media in mpv.",
+)
+def query_command(
+    target, subtarget, library, output, output_file, list_properties, action
+):
     """Query media objects."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
@@ -92,20 +101,46 @@ def query_command(target, subtarget, library, output, output_file, list_properti
     else:
         query_result = library.query(media_object)
 
-    if output == "console":
-        click.echo(query_result)
-    elif output == "clipboard":
-        pyperclip.copy(str(query_result))
-        token_count = call_tiktoken(str(query_result))["count"]
-        click.echo(f"Copied {token_count} tokens to clipboard.")
-    elif output == "file":
-        if not output_file:
-            click.echo("Output file path is required when --output is 'file'.")
-            return
-        with open(output_file, "w") as file:
-            file.write(str(query_result))
-        token_count = call_tiktoken(str(query_result))["count"]
-        click.echo(f"Wrote {token_count} tokens to {output_file}.")
+    if action:
+        output = None  # do not output to console
+        if action == "edit":
+            if isinstance(query_result, str):
+                with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
+                    temp_file.write(query_result)
+                    temp_file_path = temp_file.name
+                os.system(f"nvim {temp_file_path} -R")
+                os.unlink(temp_file_path)
+            else:
+                click.echo("The 'edit' option can only be used with string values.")
+        elif action == "play":
+            from catalog.media import Audio, Video
+
+            if isinstance(media_object, (Audio, Video)):
+                file_path = media_object.file_path
+                if file_path:
+                    os.system(f"mpv {file_path}")
+                else:
+                    click.echo(f"No file path found for {media_object.id[:5]}.")
+            else:
+                click.echo(
+                    "The 'play' option can only be used with Audio or Video objects."
+                )
+
+    if output:
+        if output == "console":
+            click.echo(query_result)
+        elif output == "clipboard":
+            pyperclip.copy(str(query_result))
+            token_count = call_tiktoken(str(query_result))["count"]
+            click.echo(f"Copied {token_count} tokens to clipboard.")
+        elif output == "file":
+            if not output_file:
+                click.echo("Output file path is required when --output is 'file'.")
+                return
+            with open(output_file, "w") as file:
+                file.write(str(query_result))
+            token_count = call_tiktoken(str(query_result))["count"]
+            click.echo(f"Wrote {token_count} tokens to {output_file}.")
 
 
 def get_subtargets(media_object):
