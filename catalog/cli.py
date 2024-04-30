@@ -538,14 +538,17 @@ def rm_command(targets, library, delete_file):
     help="Destination path for the generated pointers (default: current directory).",
 )
 def markdown_pointers_command(targets, library, output_dir):
-    """Create Markdown pointers composed of specified objects' metadata and `text`."""
+    """Create Markdown files composed of specified objects' metadata and `text`.
+
+    Targets can be media object IDs or file paths (which will be imported or matched to existing objects).
+    """
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
-    if targets:
-        media_objects = prepare_objects(library, targets)
-    else:
+    if not targets:
         media_objects = library.media_objects
+    else:
+        media_objects = prepare_objects(library, targets)
 
     for media_object in media_objects:
         try:
