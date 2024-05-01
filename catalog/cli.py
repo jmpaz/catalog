@@ -422,9 +422,11 @@ def ls_command(library, sort, page):
         if obj.__class__.__name__ == "Chat":
             segments_count = len(getattr(obj, "messages", []))
         elif obj.__class__.__name__ == "Voice":
-            segments_count = 0
-            for transcript in obj.transcripts:
-                segments_count += len(transcript["nodes"])
+            # will set/fetch from library in future
+            segments_count = round(
+                sum(map(len, (t["nodes"] for t in obj.transcripts or [])))
+                / (len(obj.transcripts) or 1)
+            )
 
         transcripts_count = len(getattr(obj, "transcripts", []))
         people = (
