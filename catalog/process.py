@@ -95,7 +95,7 @@ def format_transcript(
     transcription: dict,
     sensitivity=0.5,
     include_timestamps=True,
-    timestamp_interval=120,
+    timestamp_interval=80,
     timestamp_every_n_chunks=None,
     names=None,
 ):
@@ -120,7 +120,7 @@ def format_transcript(
         max_pause = 0
         threshold = 0
 
-    result = "**00:00**\n\n"
+    result = ""
     last_timestamp = 0
     chunk_counter = 0
     total_duration = end_times[-1] if end_times else 0
@@ -133,7 +133,7 @@ def format_transcript(
                 timestamp_every_n_chunks
                 and chunk_counter % timestamp_every_n_chunks == 0
             ):
-                if not result.endswith("\n\n"):
+                if result and not result.endswith("\n\n"):
                     result += "\n\n"
                 if total_duration >= 3600:
                     timestamp = f"\n**{int(current_time // 3600):02d}:{int((current_time % 3600) // 60):02d}:{int(current_time % 60):02d}**\n\n"
@@ -144,7 +144,7 @@ def format_transcript(
 
         speaker = speakers[i]
         if speaker != current_speaker:
-            if current_speaker is not None and not result.endswith("\n\n"):
+            if current_speaker is not None and result and not result.endswith("\n\n"):
                 result += "\n\n"
             current_speaker = speaker
             if speaker is not None:
@@ -166,4 +166,4 @@ def format_transcript(
             else:
                 result += "\n\n"
 
-    return result
+    return result.strip()
