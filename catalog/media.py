@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 import tempfile
 import yt_dlp
-from abc import ABC, abstractmethod
+from abc import ABC
 from catalog.process import format_transcript
 from contextualize.reference import process_text as delimit_text
 
