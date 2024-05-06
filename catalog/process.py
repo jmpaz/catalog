@@ -167,3 +167,68 @@ def format_transcript(
                 result += "\n\n"
 
     return result.strip()
+
+
+def resegment_transcript(transcription: dict, processor="basic", processor_params=None):
+    """Parse a transcript's contents into logical or timing-based segments depending on `simulators` availability."""
+
+    speech_data = {
+        "id": str(uuid.uuid4()),
+        "date_stored": datetime.now().isoformat(),
+        "source_transcript": transcription["id"],
+        "processor": processor,
+        "processor_params": processor_params or {},
+        "sections": [],
+        "segments": [],
+    }
+
+    def _prepare_segments(nodes, numbering=False):
+        """Prepare a string from `nodes` for further processing (if needed)."""
+        if numbering:
+            segments = [f"{i+1}|{node['content']}" for i, node in enumerate(nodes)]
+        else:
+            segments = [node["content"] for node in nodes]
+        print(f"{len(segments)} nodes processed.")
+        return "\n".join(segments)
+
+    def _call_simulator(segments, processor_params):
+        """Call the simulator to resegment the transcript."""
+        import tempfile
+        from simulators.sims import run_sim
+
+        input_file = tempfile.NamedTemporaryFile()
+        input_paths = [input_file.name]
+        example_paths = processor_params.get("example_paths", [])
+
+        # write the prepared segments to a file
+        with open(input_paths[0], "w") as file:
+            file.write(segments)
+
+        # run the simulator
+        result = run_sim(
+            sim_path=processor_params.get("sim_path", "sim.yaml"),
+            input_paths=input_paths,
+            example_paths=example_paths,
+            inference_fn=processor_params.get("inference_fn", None),
+            model=processor_params.get("model", "claude-sonnet"),
+            temperature=processor_params.get("temperature", 0.4),
+            max_tokens=processor_params.get("max_tokens", 4096),
+            debug=processor_params.get("debug", False),
+        )
+
+        return result["parsed"]
+
+    # prepare segments
+    nodes = transcription["nodes"]
+    segments = _prepare_segments(nodes)
+
+    # if the processor is set to "simulator", call the simulator
+    if processor == "simulator":
+        response = _call_simulator(segments, speech_data["processor_params"])
+        speech_data["raw_response"] = response
+    else:
+        response = segments
+
+    # TODO: Implement _parse_response() to parse the response into sections and segments
+
+    return speech_data
