@@ -1,4 +1,5 @@
 git+https://github.com/m-bain/whisperX.git
+git+https://github.com/jmpaz/simulators.git
 contextualize==0.0.3
 yt-dlp>=2024.3.10
 click>=8.1.7

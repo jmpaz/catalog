@@ -169,18 +169,8 @@ def format_transcript(
     return result.strip()
 
 
-def resegment_transcript(transcription: dict, processor="basic", processor_params=None):
-    """Parse a transcript's contents into logical or timing-based segments depending on `simulators` availability."""
-
-    speech_data = {
-        "id": str(uuid.uuid4()),
-        "date_stored": datetime.now().isoformat(),
-        "source_transcript": transcription["id"],
-        "processor": processor,
-        "processor_params": processor_params or {},
-        "sections": [],
-        "segments": [],
-    }
+def resegment_transcript(transcription: dict, processor_params=None):
+    """Parse a transcript's contents into logical segments using a sim."""
 
     def _prepare_segments(nodes, numbering=False):
         """Prepare a string from `nodes` for further processing (if needed)."""
@@ -190,6 +180,10 @@ def resegment_transcript(transcription: dict, processor="basic", processor_param
             segments = [node["content"] for node in nodes]
         print(f"{len(segments)} nodes processed.")
         return "\n".join(segments)
+
+    # prepare segments
+    nodes = transcription["nodes"]
+    segments = _prepare_segments(nodes)
 
     def _call_simulator(segments, processor_params):
         """Call the simulator to resegment the transcript."""
@@ -216,19 +210,6 @@ def resegment_transcript(transcription: dict, processor="basic", processor_param
             debug=processor_params.get("debug", False),
         )
 
-        return result["parsed"]
+        return result["cleaned"]
 
-    # prepare segments
-    nodes = transcription["nodes"]
-    segments = _prepare_segments(nodes)
-
-    # if the processor is set to "simulator", call the simulator
-    if processor == "simulator":
-        response = _call_simulator(segments, speech_data["processor_params"])
-        speech_data["raw_response"] = response
-    else:
-        response = segments
-
-    # TODO: Implement _parse_response() to parse the response into sections and segments
-
-    return speech_data
+    return _call_simulator(segments, processor_params)
