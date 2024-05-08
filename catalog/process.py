@@ -169,47 +169,16 @@ def format_transcript(
     return result.strip()
 
 
-def resegment_transcript(transcription: dict, processor_params=None):
-    """Parse a transcript's contents into logical segments using a sim."""
+def process_transcript(obj, transcript_id=None, sim_params=None):
+    from catalog.speech import prepare_speech_data
 
-    def _prepare_segments(nodes, numbering=False):
-        """Prepare a string from `nodes` for further processing (if needed)."""
-        if numbering:
-            segments = [f"{i+1}|{node['content']}" for i, node in enumerate(nodes)]
-        else:
-            segments = [node["content"] for node in nodes]
-        print(f"{len(segments)} nodes processed.")
-        return "\n".join(segments)
+    if not hasattr(obj, "can_transcribe"):
+        raise ValueError("This media object cannot be transcribed")
 
-    # prepare segments
-    nodes = transcription["nodes"]
-    segments = _prepare_segments(nodes)
+    if not transcript_id:
+        print("Transcript not provided; using last transcript")
 
-    def _call_simulator(segments, processor_params):
-        """Call the simulator to resegment the transcript."""
-        import tempfile
-        from simulators.sims import run_sim
+    speech_data = prepare_speech_data(obj, transcript_id, sim_params)
+    obj.speech_data.append(speech_data)
 
-        input_file = tempfile.NamedTemporaryFile()
-        input_paths = [input_file.name]
-        example_paths = processor_params.get("example_paths", [])
-
-        # write the prepared segments to a file
-        with open(input_paths[0], "w") as file:
-            file.write(segments)
-
-        # run the simulator
-        result = run_sim(
-            sim_path=processor_params.get("sim_path", "sim.yaml"),
-            input_paths=input_paths,
-            example_paths=example_paths,
-            inference_fn=processor_params.get("inference_fn", None),
-            model=processor_params.get("model", "claude-sonnet"),
-            temperature=processor_params.get("temperature", 0.4),
-            max_tokens=processor_params.get("max_tokens", 4096),
-            debug=processor_params.get("debug", False),
-        )
-
-        return result["cleaned"]
-
-    return _call_simulator(segments, processor_params)
+    print(f"Stored speech data for {obj.id}")

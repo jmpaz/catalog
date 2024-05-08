@@ -165,6 +165,7 @@ class Video(MediaObject):
     def __init__(self, file_path=None, url=None, name=None, source_filename=None):
         super().__init__(file_path, url, name)
         self.transcripts = []
+        self.speech_data = []
 
 
 @can_transcribe
@@ -172,6 +173,7 @@ class Audio(MediaObject):
     def __init__(self, file_path=None, url=None, name=None, source_filename=None):
         super().__init__(file_path, url, name)
         self.transcripts = []
+        self.speech_data = []
 
 
 class Voice(Audio):
