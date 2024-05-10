@@ -35,6 +35,7 @@ def resegment_transcript(transcription: dict, processor_params=None):
         # run the simulator
         result = run_sim(
             sim_path=processor_params.get("sim_path", "sim.yaml"),
+            sim_path_r2=processor_params.get("sim_path_r2", "sim.yaml"),
             input_paths=input_paths,
             example_paths=example_paths,
             inference_fn=processor_params.get("inference_fn", None),
@@ -75,15 +76,13 @@ def parse_sexp(sexp_string):
     return {"sections": sections, "nodes": nodes}
 
 
-def prepare_speech_data(mediaobject, transcript_id=None, sim_params=None):
-    if transcript_id is None:
+def prepare_speech_data(mediaobject, target=None, sim_params=None):
+    if target is None:
         transcript = mediaobject.transcripts[-1]
-    elif isinstance(transcript_id, int):
-        transcript = mediaobject.transcripts[transcript_id]
+    elif isinstance(target, int):
+        transcript = mediaobject.transcripts[target]
     else:
-        transcript = next(
-            t for t in mediaobject.transcripts if t["id"] == transcript_id
-        )
+        transcript = next(t for t in mediaobject.transcripts if t["id"] == target)
 
     speech_data = {
         "id": str(uuid.uuid4()),

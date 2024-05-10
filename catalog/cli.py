@@ -3,11 +3,12 @@ import sys
 import click
 import pyperclip
 import tempfile
+import yaml
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
 from catalog import Library
-from catalog.process import transcribe
+from catalog.process import transcribe, process_transcript
 from contextualize.tokenize import call_tiktoken
 
 
@@ -562,6 +563,56 @@ def markdown_pointers_command(targets, library, output_dir):
             click.echo(f"Error creating pointer for {media_object.id[:5]}: {str(e)}")
 
 
+@click.command("process")
+@click.argument("id")
+@click.option(
+    "--library",
+    default="~/.config/catalog/library.json",
+    help="Path to library file (default: ~/.config/catalog/library.json).",
+)
+@click.option("--transcript", help="Transcript index or UUID to use for processing.")
+@click.option(
+    "--config",
+    type=click.Path(exists=True),
+    help="Path to a YAML configuration file containing processing parameters.",
+)
+def process_command(id, library, transcript, config):
+    """Process a media object's data (only transcripts currently supported) using a specified configuration."""
+    library_path = os.path.expanduser(library)
+    library = Library(library_path)
+
+    media_objects = prepare_objects(library, [id])
+
+    if not media_objects:
+        click.echo(f"No media object found with ID: {id}")
+        return
+
+    media_object = media_objects[0]
+
+    if not config:
+        click.echo("Error: --config must be provided.")
+        return
+
+    try:
+        with open(config, "r") as file:
+            sim_params = yaml.safe_load(file)
+    except Exception as e:
+        click.echo(f"Error loading configuration file: {str(e)}")
+        return
+
+    try:
+        process_transcript(media_object, transcript, sim_params)
+        click.echo(f"Processed transcript for {media_object.id[:5]}")
+    except ValueError as e:
+        click.echo(f"Error processing transcript: {str(e)}")
+
+    try:
+        library.save_library()
+        click.echo(f"Changes saved to {library_path}.")
+    except Exception as e:
+        click.echo(f"Error saving library: {str(e)}")
+
+
 cli.add_command(query_command)
 cli.add_command(transcribe_command)
 cli.add_command(add_command)
@@ -569,3 +620,4 @@ cli.add_command(store_command)
 cli.add_command(ls_command)
 cli.add_command(rm_command)
 cli.add_command(markdown_pointers_command)
+cli.add_command(process_command)

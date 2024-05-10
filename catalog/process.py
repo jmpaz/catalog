@@ -169,16 +169,16 @@ def format_transcript(
     return result.strip()
 
 
-def process_transcript(obj, transcript_id=None, sim_params=None):
+def process_transcript(obj, target=None, sim_params=None):
     from catalog.speech import prepare_speech_data
 
     if not hasattr(obj, "can_transcribe"):
         raise ValueError("This media object cannot be transcribed")
 
-    if not transcript_id:
+    if not target:
         print("Transcript not provided; using last transcript")
 
-    speech_data = prepare_speech_data(obj, transcript_id, sim_params)
+    speech_data = prepare_speech_data(obj, target, sim_params)
     obj.speech_data.append(speech_data)
 
     print(f"Stored speech data for {obj.id}")
