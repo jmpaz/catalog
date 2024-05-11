@@ -11,3 +11,4 @@ outputs/
 *.srt
 *.json
 *.txt
+*.yaml
