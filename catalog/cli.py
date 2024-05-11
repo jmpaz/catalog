@@ -85,16 +85,85 @@ def query_command(
         click.echo("\n".join(subtargets))
         return
 
+    def _format_speech_data(speech_data):
+        def _calculate_depth(nodes, index):
+            depth = 0
+            current_index = index
+            while current_index is not None:
+                current_node = next(
+                    (node for node in nodes if node["index"] == current_index), None
+                )
+                if current_node:
+                    current_index = current_node.get("parent")
+                    depth += 1
+                else:
+                    current_index = None
+            return depth - 1
+
+        output = []
+        for entry in speech_data:
+            for key, value in entry.items():
+                if key == "nodes":
+                    continue
+                if key == "processor_params":
+                    output.append("parameters:")
+                    for param_key, param_value in value.items():
+                        output.append(f"  {param_key}: {param_value}")
+                    output.append("\n------------")
+                elif key == "sections":
+                    for section in value:
+                        output.append(f"\n## {section['label']}")
+                        for index in range(
+                            section["indeces"][0], section["indeces"][1] + 1
+                        ):
+                            message = next(
+                                (
+                                    node
+                                    for node in entry["nodes"]
+                                    if node["index"] == index
+                                ),
+                                None,
+                            )
+                            if message:
+                                depth = _calculate_depth(entry["nodes"], index)
+                                indent = "  " * depth
+                                output.append(f"{indent}- {message['text']}")
+                        output.append("")
+                    output.append("\n============\n")
+                else:
+                    output.append(f"{key.replace('_', ' ')}: {value}")
+            output.append("")
+        return "\n".join(output)
+
+    def _format_transcript_nodes(transcripts):
+        output = []
+        for transcript in transcripts:
+            for key, value in transcript.items():
+                if key == "params":
+                    output.append("Params:")
+                    for param_key, param_value in value.items():
+                        output.append(f"  {param_key}: {param_value}")
+                elif key == "nodes":
+                    output.append(f"nodes: {len(value)}")
+                    output.append("\n------------\n")
+                    for node in value:
+                        output.append(node["content"])
+                        output.append("")
+                    output.append("============\n")
+                else:
+                    output.append(f"{key.replace('_', ' ')}: {value}")
+        return "\n".join(output)
+
     if subtarget:
         if subtarget in media_object.metadata:
             query_result = media_object.metadata.get(subtarget)
         else:
             query_result = getattr(media_object, subtarget, None)
 
-            # replace transcript nodes with node count
-            if subtarget == "transcripts":
-                for transcript in query_result:
-                    transcript["nodes"] = len(transcript["nodes"])
+            if subtarget == "speech_data":
+                query_result = _format_speech_data(query_result)
+            elif subtarget == "transcripts":
+                query_result = _format_transcript_nodes(query_result)
 
             if query_result is None:
                 click.echo(f"Invalid subtarget: {subtarget}")
