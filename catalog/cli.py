@@ -414,6 +414,7 @@ def ls_command(library, sort, page):
     table.add_column("People")
     table.add_column("Segments", justify="right")
     table.add_column("Transcripts", justify="right")
+    table.add_column("Processed", justify="right")
     table.add_column("Date Created", justify="right")
     table.add_column("Date Stored", justify="right")
 
@@ -430,6 +431,7 @@ def ls_command(library, sort, page):
             )
 
         transcripts_count = len(getattr(obj, "transcripts", []))
+        processed_count = len(getattr(obj, "speech_data", []))
         people = (
             [name for name in obj.participants]
             if "participants" in obj.__dict__
@@ -451,6 +453,7 @@ def ls_command(library, sort, page):
             str(people_str),
             str(segments_count),
             str(transcripts_count),
+            str(processed_count),
             created,
             stored,
         )

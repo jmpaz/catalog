@@ -217,6 +217,9 @@ class Library:
         if hasattr(media_object, "transcripts"):
             output.append(f"transcripts: {len(media_object.transcripts)} entries")
 
+        if hasattr(media_object, "speech_data"):
+            output.append(f"speech_data: {len(media_object.speech_data)} entries")
+
         if hasattr(media_object, "participants"):
             output.append(f"participants: {len(media_object.participants)} entries")
         if hasattr(media_object, "messages"):
