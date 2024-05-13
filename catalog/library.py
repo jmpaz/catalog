@@ -354,7 +354,17 @@ tags:
                 f"Failed to import class '{class_name}' from module '{module_name}'"
             )
 
-        media_object = media_object_class(file_path=serialized_data["file_path"])
+        if class_name == "Chat":
+            media_object = media_object_class(
+                name=serialized_data["metadata"]["name"],
+                chat_metadata=serialized_data.get("chat_metadata", {}),
+                participants=serialized_data.get("participants", []),
+                messages=serialized_data.get("messages", []),
+                source_filename=serialized_data["metadata"]["source_filename"],
+            )
+        else:
+            media_object = media_object_class(file_path=serialized_data["file_path"])
+
         media_object.id = serialized_data["id"]
         media_object.md5_hash = serialized_data["md5_hash"]
 
@@ -368,8 +378,6 @@ tags:
                 )
             else:
                 media_object.metadata[key] = value
-        if "chat_metadata" in serialized_data:
-            media_object.chat_metadata = serialized_data["chat_metadata"]
 
         # set text
         media_object.text = serialized_data["text"]
