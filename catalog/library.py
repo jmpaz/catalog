@@ -5,9 +5,11 @@ import shutil
 import json
 import hashlib
 from send2trash import send2trash
+from fuzzywuzzy import fuzz
 from datetime import datetime
 from catalog.media import MediaObject
 from contextualize.tokenize import call_tiktoken
+import uuid
 
 
 class Library:
@@ -19,6 +21,7 @@ class Library:
         self.library_path = os.path.expanduser(library_path)
         self.datastore_path = os.path.expanduser(datastore_path)
         self.media_objects = []
+        self.tags = []
         self.load_library()
 
     def import_media_object(
@@ -164,8 +167,9 @@ class Library:
                 library_data = json.load(file)
                 self.media_objects = [
                     self.deserialize_object(obj_data)
-                    for obj_data in library_data["media_objects"]
+                    for obj_data in library_data.get("media_objects", [])
                 ]
+                self.tags = library_data.get("tags", [])
         else:
             print(
                 f"Library file not found at {self.library_path}. Starting with an empty library."
@@ -177,7 +181,8 @@ class Library:
             "media_objects": [
                 self.serialize_object(media_object)
                 for media_object in self.media_objects
-            ]
+            ],
+            "tags": self.tags,
         }
         with open(self.library_path, "w") as file:
             json.dump(library_data, file, indent=2)
@@ -303,6 +308,59 @@ tags:
         with open(f"{path}/{name}.md", "w") as file:
             file.write(content)
 
+    def create_tag(self, name, parent=None):
+        tag_id = str(uuid.uuid4())
+        tag = {
+            "id": tag_id,
+            "name": name,
+            "parents": [parent] if parent else [],
+        }
+        self.tags.append(tag)
+        return tag_id
+
+    def get_tag_id(self, target):
+        if target in [tag["id"] for tag in self.tags]:
+            return target
+
+        target_parts = target.split("/")
+        best_match = None
+        best_ratio = 0
+
+        for tag in self.tags:
+            tag_parts = [tag["name"]] + [
+                self.get_tag_name(parent) for parent in tag["parents"]
+            ]
+            if len(target_parts) != len(tag_parts):
+                continue
+
+            ratio = fuzz.ratio(" ".join(target_parts), " ".join(tag_parts))
+            if ratio > best_ratio:
+                best_match = tag["id"]
+                best_ratio = ratio
+
+        if best_ratio >= 80:
+            return best_match
+        else:
+            raise ValueError(f"No close match found for tag: {target}")
+
+    def tag_object(self, media_object, tag=None, tag_str=None, source="user"):
+        if tag_str:
+            tag_id = self.get_tag_id(tag_str)
+
+        if "tags" not in media_object.metadata:
+            media_object.metadata["tags"] = []
+
+        tag_exists = any(tag_id == tag["id"] for tag in media_object.metadata["tags"])
+        if tag_exists:
+            raise ValueError(f"Tag {tag_id} already assigned to obj {media_object.id}")
+
+        tag_data = {
+            "id": tag,
+            "date_assigned": datetime.now().isoformat(),
+            "source": source,
+        }
+        media_object.metadata["tags"].append(tag_data)
+
     def serialize_object(self, media_object):
         serialized_data = {
             "id": media_object.id,
@@ -321,6 +379,7 @@ tags:
                 ),
                 "date_stored": media_object.metadata.get("date_stored"),
                 "source_filename": media_object.metadata.get("source_filename"),
+                "tags": media_object.metadata.get("tags", []),
             },
             "chat_metadata": getattr(media_object, "chat_metadata", {})
             if hasattr(media_object, "chat_metadata")
