@@ -448,17 +448,3 @@ tags:
                 setattr(media_object, attr_name, attr_value)
 
         return media_object
-
-
-class Job:
-    def __init__(self):
-        self.tasks = []
-
-    def add_task(self, task):
-        if not callable(task):
-            raise ValueError("task must be a callable")
-        self.tasks.append(task)
-
-    def execute(self, media_object):
-        for task in self.tasks:
-            task(media_object)
