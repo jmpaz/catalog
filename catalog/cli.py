@@ -9,7 +9,10 @@ from rich.console import Console
 from rich.table import Table
 from catalog import Library
 from catalog.process import transcribe, process_transcript
-from catalog.utils import _format_speech_data, _format_transcript_nodes
+from catalog.utils import (
+    fetch_subtarget_entry,
+    query_subtarget,
+)
 from contextualize.tokenize import call_tiktoken
 
 
@@ -87,19 +90,11 @@ def query_command(
         return
 
     if subtarget:
-        if subtarget in media_object.metadata:
-            query_result = media_object.metadata.get(subtarget)
-        else:
-            query_result = getattr(media_object, subtarget, None)
-
-            if subtarget == "speech_data":
-                query_result = _format_speech_data(query_result)
-            elif subtarget == "transcripts":
-                query_result = _format_transcript_nodes(query_result)
-
-            if query_result is None:
-                click.echo(f"Invalid subtarget: {subtarget}")
-                return
+        result = query_subtarget(media_object, subtarget)
+        if result is None:
+            click.echo(f"Invalid subtarget: {subtarget}")
+            return
+        query_result = result
     else:
         query_result = library.query(media_object)
 
@@ -504,24 +499,23 @@ def rm_command(targets, library, delete_file):
                     library.remove_media_object(media_object, delete_file=delete_file)
                     click.echo(f"Removed media object '{media_object.id}'")
             elif len(parts) == 2:
-                # delete all entries of a specific type
-                raise ValueError("not yet implemented")
+                raise ValueError("Specify an entry ID for subtarget deletion.")
             elif len(parts) == 3:
-                # delete specific entry
                 type_id, entry_id = parts[1], parts[2]
-                if type_id in ["transcripts", "processed_text"]:
-                    media_object, entry = library.fetch_entry(
-                        media_id, type_id, entry_id
-                    )
+                if type_id in ["transcripts", "speech_data", "processed_text"]:
+                    media_object = library.fetch([media_id])[0]
+                    entry = fetch_subtarget_entry(media_object, type_id, entry_id)
                     full_entry_id = entry["id"]
                     if click.confirm(
                         f"Delete {type_id} entry {full_entry_id} from '{media_object.id}'?",
                         abort=True,
                     ):
-                        media_object.remove_entry(type_id, entry_id)
+                        media_object.remove_entry(type_id, full_entry_id)
                         click.echo(
                             f"Removed {type_id} entry {full_entry_id} from '{media_object.id}'"
                         )
+                else:
+                    raise ValueError(f"Invalid entry type: {type_id}")
 
         library.save_library()
         click.echo(f"Changes saved to {library_path}.")

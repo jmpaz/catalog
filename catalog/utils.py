@@ -7,7 +7,7 @@ def read_secrets(filename="secrets.txt"):
     return secrets
 
 
-def _format_speech_data(speech_data):
+def format_speech_data(speech_data):
     def _calculate_depth(nodes, index):
         depth = 0
         current_index = index
@@ -54,7 +54,7 @@ def _format_speech_data(speech_data):
     return "\n".join(output)
 
 
-def _format_transcript_nodes(transcripts):
+def format_transcript_nodes(transcripts):
     output = []
     for transcript in transcripts:
         for key, value in transcript.items():
@@ -72,3 +72,54 @@ def _format_transcript_nodes(transcripts):
             else:
                 output.append(f"{key.replace('_', ' ')}: {value}")
     return "\n".join(output)
+
+
+def fetch_subtarget_entry(media_object, entry_type, entry_id):
+    """Fetch a specific entry from a media object by index, partial/full UUID, or -1 for the last entry."""
+    entries = getattr(media_object, entry_type, [])
+
+    try:
+        # fetch by index, or -1 for the last entry
+        index = int(entry_id)
+        if index == -1:
+            return entries[-1] if entries else None
+        elif 0 <= index < len(entries):
+            return entries[index]
+        else:
+            raise ValueError(f"Index out of range: {entry_id}")
+    except ValueError:
+        # fetch by UUID
+        entry = next((e for e in entries if e["id"].startswith(entry_id)), None)
+        if entry:
+            return entry
+        else:
+            raise ValueError(f"No {entry_type} entry found with ID: {entry_id}")
+
+
+def query_subtarget(media_object, subtarget):
+    parts = subtarget.split(":", 2)
+    entry_type = parts[0]
+    entry_id = parts[1] if len(parts) > 1 else None
+    param = parts[2] if len(parts) > 2 else None
+
+    if entry_type in ["transcripts", "speech_data", "processed_text"]:
+        if entry_id:
+            entry = fetch_subtarget_entry(media_object, entry_type, entry_id)
+            if param:
+                return entry.get(param)
+            elif entry_type == "speech_data":
+                return format_speech_data([entry])
+            elif entry_type == "transcripts":
+                return format_transcript_nodes([entry])
+            else:
+                return entry
+        else:
+            entries = getattr(media_object, entry_type, [])
+            if entry_type == "speech_data":
+                return format_speech_data(entries)
+            elif entry_type == "transcripts":
+                return format_transcript_nodes(entries)
+            else:
+                return entries
+    else:
+        return None
