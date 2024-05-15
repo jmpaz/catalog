@@ -573,6 +573,38 @@ def process_command(id, library, transcript, config):
         click.echo(f"Error saving library: {str(e)}")
 
 
+@click.command("export")
+@click.argument("target")
+@click.option(
+    "--format",
+    default="md",
+    help="Output format: 'md' (Markdown), 'sexp' (S-expression).",
+)
+@click.option(
+    "--library",
+    default="~/.config/catalog/library.json",
+    help="Path to library file (default: ~/.config/catalog/library.json).",
+)
+def export_command(target, format, library):
+    """Export text data of a media object."""
+    library_path = os.path.expanduser(library)
+    library = Library(library_path)
+
+    media_objects = prepare_objects(library, [target])
+
+    if not media_objects:
+        click.echo(f"No media object found with ID: {target}")
+        return
+
+    media_object = media_objects[0]
+
+    try:
+        data = media_object.export_text(format=format)
+        click.echo(data)
+    except ValueError as e:
+        click.echo(f"Error: {str(e)}")
+
+
 cli.add_command(query_command)
 cli.add_command(transcribe_command)
 cli.add_command(add_command)
@@ -580,3 +612,4 @@ cli.add_command(ls_command)
 cli.add_command(rm_command)
 cli.add_command(markdown_pointers_command)
 cli.add_command(process_command)
+cli.add_command(export_command)
