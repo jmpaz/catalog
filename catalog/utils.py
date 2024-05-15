@@ -7,7 +7,7 @@ def read_secrets(filename="secrets.txt"):
     return secrets
 
 
-def format_speech_data(speech_data):
+def format_speech_data(speech_data, minimal=False):
     def _calculate_depth(nodes, index):
         depth = 0
         current_index = index
@@ -27,7 +27,7 @@ def format_speech_data(speech_data):
         for key, value in entry.items():
             if key == "nodes":
                 continue
-            if key == "processor_params":
+            if key == "processor_params" and not minimal:
                 output.append("parameters:")
                 for param_key, param_value in value.items():
                     output.append(f"  {param_key}: {param_value}")
@@ -47,29 +47,32 @@ def format_speech_data(speech_data):
                             indent = "  " * depth
                             output.append(f"{indent}- {message['text']}")
                     output.append("")
-                output.append("\n============\n")
-            else:
+                if not minimal:
+                    output.append("\n============\n")
+            elif not minimal:
                 output.append(f"{key.replace('_', ' ')}: {value}")
         output.append("")
-    return "\n".join(output)
+    return "\n".join(output).strip()
 
 
-def format_transcript_nodes(transcripts):
+def format_transcript_nodes(transcripts, minimal=False):
     output = []
     for transcript in transcripts:
         for key, value in transcript.items():
-            if key == "params":
+            if key == "params" and not minimal:
                 output.append("Params:")
                 for param_key, param_value in value.items():
                     output.append(f"  {param_key}: {param_value}")
             elif key == "nodes":
-                output.append(f"nodes: {len(value)}")
-                output.append("\n------------\n")
+                if not minimal:
+                    output.append(f"nodes: {len(value)}")
+                    output.append("\n------------\n")
                 for node in value:
                     output.append(node["content"])
                     output.append("")
-                output.append("============\n")
-            else:
+                if not minimal:
+                    output.append("============\n")
+            elif not minimal:
                 output.append(f"{key.replace('_', ' ')}: {value}")
     return "\n".join(output)
 

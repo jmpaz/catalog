@@ -5,6 +5,7 @@ import tempfile
 import yt_dlp
 from abc import ABC
 from catalog.process import format_transcript
+from catalog.utils import format_speech_data, format_transcript_nodes
 from contextualize.reference import process_text as delimit_text
 
 
@@ -135,6 +136,27 @@ class MediaObject(ABC):
     def can_transcribe(self):
         return False
 
+    def export_text(self, format="md"):
+        if format not in ["md", "sexp"]:
+            raise ValueError("Unsupported format. Choose 'md' or 'sexp'.")
+
+        if format == "md":
+            output = self.get_markdown_str()
+        elif format == "sexp":
+            output = self.get_sexp_str()
+
+        if output == "":
+            raise ValueError("No text data available to export.")
+
+        return output
+
+    def get_markdown_str(self):
+        """Return a Markdown string representation of the object's text content."""
+        raise NotImplementedError("Not available for this object type.")
+
+    def get_sexp_str(self):
+        """Return an S-expression string representation of the object's text content."""
+        raise NotImplementedError("Not yet implemented.")
 
 
 class Image(MediaObject):
@@ -154,6 +176,14 @@ class Video(MediaObject):
         self.transcripts = []
         self.speech_data = []
 
+    def get_markdown_str(self, minimal=True):
+        if self.speech_data:
+            return format_speech_data([self.speech_data[-1]], minimal)
+        elif self.transcripts:
+            return format_transcript_nodes([self.transcripts[-1]], minimal)
+        else:
+            return f"# {self.metadata.get('name', 'Unnamed Video')}\n\nNo transcription available."
+
 
 @can_transcribe
 class Audio(MediaObject):
@@ -161,6 +191,14 @@ class Audio(MediaObject):
         super().__init__(file_path, url, name)
         self.transcripts = []
         self.speech_data = []
+
+    def get_markdown_str(self, minimal=True):
+        if self.speech_data:
+            return format_speech_data([self.speech_data[-1]], minimal)
+        elif self.transcripts:
+            return format_transcript_nodes([self.transcripts[-1]], minimal)
+        else:
+            return f"# {self.metadata.get('name', 'Unnamed Audio')}\n\nNo transcription available."
 
 
 class Voice(Audio):
