@@ -316,44 +316,6 @@ def add_command(path, library, datastore, media_class, no_copy):
             click.echo(f"Error saving library: {str(e)}")
 
 
-@click.command("store")
-@click.argument("id")
-@click.argument("text", type=click.File("r"))
-@click.option(
-    "--library",
-    default="~/.config/catalog/library.json",
-    help="Path to library file (default: ~/.config/catalog/library.json).",
-)
-@click.option("--source", help="Source of the processed text.")
-@click.option("--label", help="Label for the processed text entry.")
-def store_command(id, text, library, source, label):
-    """Store processed text for a media object."""
-    library_path = os.path.expanduser(library)
-    library = Library(library_path)
-
-    media_objects = prepare_objects(library, [id])
-
-    if not media_objects:
-        click.echo(f"No media object found with ID: {id}")
-        return
-
-    media_object = media_objects[0]
-    processed_text = text.read().strip()
-
-    try:
-        media_object.store_processed_text(processed_text, source=source, label=label)
-        media_object.set_text()
-        click.echo(f"Stored processed text for {media_object.id[:5]}")
-    except ValueError as e:
-        click.echo(f"Error storing processed text: {str(e)}")
-
-    try:
-        library.save_library()
-        click.echo(f"Changes saved to {library_path}.")
-    except Exception as e:
-        click.echo(f"Error saving library: {str(e)}")
-
-
 @click.command("ls")
 @click.option(
     "--library",
@@ -614,7 +576,6 @@ def process_command(id, library, transcript, config):
 cli.add_command(query_command)
 cli.add_command(transcribe_command)
 cli.add_command(add_command)
-cli.add_command(store_command)
 cli.add_command(ls_command)
 cli.add_command(rm_command)
 cli.add_command(markdown_pointers_command)

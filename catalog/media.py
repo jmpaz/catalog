@@ -135,19 +135,6 @@ class MediaObject(ABC):
     def can_transcribe(self):
         return False
 
-    def store_processed_text(self, processed_str, source=None, label=None):
-        # ensure the string doesn't already exist as a text value of any processed_text entry
-        if any(processed_str == entry["text"] for entry in self.processed_text):
-            raise ValueError(f"Text is already stored in processed_text for {self.id}")
-
-        entry = {
-            "id": str(uuid.uuid4()),
-            "label": label,
-            "source": source,
-            "date_stored": datetime.now().isoformat(),
-            "text": processed_str,
-        }
-        self.processed_text.append(entry)
 
 
 class Image(MediaObject):
