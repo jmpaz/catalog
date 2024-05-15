@@ -339,10 +339,21 @@ def add_command(path, library, datastore, media_class, no_copy):
     help="Sort media objects by the specified criteria.",
 )
 @click.option("--page", is_flag=True, help="Display results in a pager.")
-def ls_command(library, sort, page):
-    """List media objects in a formatted table."""
+@click.option("--tags", is_flag=True, help="Display a table of available tags.")
+def ls_command(library, sort, page, tags):
+    """List media objects in a formatted table or display available tags."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
+
+    if tags:
+        table = prepare_tags_table(library)
+        console = Console()
+        if page:
+            with console.pager():
+                console.print(table)
+        else:
+            console.print(table)
+        return
 
     media_objects = library.media_objects
 
@@ -382,7 +393,6 @@ def ls_command(library, sort, page):
         if obj.__class__.__name__ == "Chat":
             segments_count = len(getattr(obj, "messages", []))
         elif obj.__class__.__name__ == "Voice":
-            # will set/fetch from library in future
             segments_count = round(
                 sum(map(len, (t["nodes"] for t in obj.transcripts or [])))
                 / (len(obj.transcripts) or 1)
@@ -422,6 +432,25 @@ def ls_command(library, sort, page):
             console.print(table)
     else:
         console.print(table)
+
+
+def prepare_tags_table(library):
+    table = Table(show_lines=True)
+    table.add_column("ID", no_wrap=True)
+    table.add_column("Name")
+    table.add_column("Parent(s)")
+
+    sorted_tags = sorted(library.tags, key=lambda tag: tag["name"].lower())
+
+    for tag in sorted_tags:
+        tag_name = tag["name"]
+        parent_names = [
+            library.get_tag_name(parent) for parent in tag.get("parents", [])
+        ]
+        parent_names_str = " / ".join(parent_names)
+        table.add_row(tag["id"][:6], tag_name, parent_names_str)
+
+    return table
 
 
 @click.command(
