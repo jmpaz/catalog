@@ -39,7 +39,7 @@ class Library:
             if media_object_class == Chat and file_path.lower().endswith(
                 (".yaml", ".yml")
             ):
-                chat_metadata, participants, messages = _import_chat(file_path)
+                chat_metadata, participants, messages = _prepare_chat_data(file_path)
                 media_object = Chat(
                     file_path=file_path,
                     name=name,
@@ -62,7 +62,7 @@ class Library:
                 self.save_library()
                 return media_object
 
-        def _import_chat(yaml_file):
+        def _prepare_chat_data(yaml_file):
             """Prepare chat data for storage."""
             with open(yaml_file, "r") as file:
                 data = yaml.safe_load(file)
