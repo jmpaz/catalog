@@ -308,6 +308,22 @@ tags:
         with open(f"{path}/{name}.md", "w") as file:
             file.write(content)
 
+    def get_tag_name(self, tag_id):
+        tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
+        if not tag:
+            raise ValueError(f"No tag found with ID: {tag_id}")
+
+        parts = [tag["name"]]
+        while tag.get("parents"):
+            parent_id = tag["parents"][0]
+            tag = next((t for t in self.tags if t["id"] == parent_id), None)
+            if tag:
+                parts.insert(0, tag["name"])
+            else:
+                break
+
+        return "/".join(parts)
+
     def create_tag(self, name, parent=None):
         tag_id = str(uuid.uuid4())
         tag = {
@@ -328,7 +344,7 @@ tags:
 
         for tag in self.tags:
             tag_parts = [tag["name"]] + [
-                self.get_tag_name(parent) for parent in tag["parents"]
+                self.get_tag_name(parent) for parent in tag.get("parents", [])
             ]
             if len(target_parts) != len(tag_parts):
                 continue
@@ -355,11 +371,63 @@ tags:
             raise ValueError(f"Tag {tag_id} already assigned to obj {media_object.id}")
 
         tag_data = {
-            "id": tag,
+            "id": tag_id,
             "date_assigned": datetime.now().isoformat(),
             "source": source,
         }
         media_object.metadata["tags"].append(tag_data)
+
+
+    def untag_object(self, media_object, tag_id):
+        if "tags" in media_object.metadata:
+            media_object.metadata["tags"] = [
+                tag for tag in media_object.metadata["tags"] if tag["id"] != tag_id
+            ]
+
+    def fetch_subtarget_entry(self, media_object, entry_type, entry_id):
+        entries = getattr(media_object, entry_type, [])
+
+        try:
+            index = int(entry_id)
+            if index == -1:
+                return entries[-1] if entries else None
+            elif 0 <= index < len(entries):
+                return entries[index]
+            else:
+                raise ValueError(f"Index out of range: {entry_id}")
+        except ValueError:
+            entry = next((e for e in entries if e["id"].startswith(entry_id)), None)
+            if entry:
+                return entry
+            else:
+                raise ValueError(f"No {entry_type} entry found with ID: {entry_id}")
+
+    def untag_entry(self, media_object, entry_type, entry_id, tag_id):
+        entry = self.fetch_subtarget_entry(media_object, entry_type, entry_id)
+        if "tags" in entry:
+            entry["tags"] = [tag for tag in entry["tags"] if tag["id"] != tag_id]
+
+    def tag_entry(
+        self, media_object, entry_type, entry_id, tag=None, tag_str=None, source="user"
+    ):
+        entry = self.fetch_subtarget_entry(media_object, entry_type, entry_id)
+
+        if tag_str:
+            tag_id = self.get_tag_id(tag_str)
+
+        if "tags" not in entry:
+            entry["tags"] = []
+
+        tag_exists = any(tag_id == tag["id"] for tag in entry["tags"])
+        if tag_exists:
+            raise ValueError(f"Tag {tag_id} already assigned to entry {entry_id}")
+
+        tag_data = {
+            "id": tag_id,
+            "date_assigned": datetime.now().isoformat(),
+            "source": source,
+        }
+        entry["tags"].append(tag_data)
 
     def serialize_object(self, media_object):
         serialized_data = {

@@ -605,6 +605,59 @@ def export_command(target, format, library):
         click.echo(f"Error: {str(e)}")
 
 
+@click.command("tag")
+@click.argument("target")
+@click.argument("tag_str")
+@click.option(
+    "--library",
+    default="~/.config/catalog/library.json",
+    help="Path to library file (default: ~/.config/catalog/library.json).",
+)
+@click.option(
+    "--remove",
+    is_flag=True,
+    help="Remove the specified tag instead of assigning it.",
+)
+def tag_command(target, tag_str, library, remove):
+    """Assign or remove a tag to a media object or entry."""
+    library_path = os.path.expanduser(library)
+    library = Library(library_path)
+
+    try:
+        parts = target.split(":")
+        media_id = parts[0]
+        media_object = library.fetch([media_id])[0]
+
+        if len(parts) == 3:
+            entry_type, entry_id = parts[1], parts[2]
+            if entry_type not in ["transcripts", "speech_data"]:
+                click.echo(f"Error: Invalid entry type '{entry_type}'.")
+                return
+
+            if remove:
+                tag_id = library.get_tag_id(tag_str)
+                library.untag_entry(media_object, entry_type, entry_id, tag_id)
+            else:
+                library.tag_entry(media_object, entry_type, entry_id, tag_str=tag_str)
+        else:
+            if remove:
+                tag_id = library.get_tag_id(tag_str)
+                library.untag_object(media_object, tag_id)
+            else:
+                library.tag_object(media_object, tag_str=tag_str)
+
+        library.save_library()
+        click.echo(f"Tag operation successful for {target}.")
+
+    except ValueError as e:
+        click.echo(f"Error: {str(e)}")
+    except Exception as e:
+        click.echo(f"Unexpected error: {str(e)}")
+
+
+cli.add_command(tag_command)
+
+
 cli.add_command(query_command)
 cli.add_command(transcribe_command)
 cli.add_command(add_command)
@@ -613,3 +666,4 @@ cli.add_command(rm_command)
 cli.add_command(markdown_pointers_command)
 cli.add_command(process_command)
 cli.add_command(export_command)
+cli.add_command(tag_command)
