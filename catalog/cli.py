@@ -323,25 +323,14 @@ def add_command(path, library, datastore, media_class, no_copy):
     default="~/.config/catalog/library.json",
     help="Path to library file (default: ~/.config/catalog/library.json).",
 )
+@click.option("--tags", is_flag=True, help="List tags instead of objects.")
+@click.option("--page", is_flag=True, help="Display results in a pager.")
 @click.option(
     "--sort",
-    type=click.Choice(
-        [
-            "date",
-            "date-asc",
-            "transcripts",
-            "transcripts-asc",
-            "tokens",
-            "tokens-asc",
-        ],
-        case_sensitive=False,
-    ),
-    default="date",
-    help="Sort media objects by the specified criteria.",
+    type=str,
+    help="Sort by specified fields (created, modified, stored, class, segments, transcripts, processed). Add :asc for ascending order (e.g., stored:asc). Multiple sorts can be comma-separated (e.g., class:asc,stored).",
 )
-@click.option("--page", is_flag=True, help="Display results in a pager.")
-@click.option("--tags", is_flag=True, help="Display a table of available tags.")
-def ls_command(target, library, sort, page, tags):
+def ls_command(target, library, page, tags, sort):
     """List media objects or their entries (if specified by full or partial ID) in a table."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
@@ -379,18 +368,50 @@ def ls_command(target, library, sort, page, tags):
             return datetime.fromisoformat(date)
         return datetime.min
 
-    sort_keys = {
-        "date": lambda obj: get_date(obj, "date_created")
-        or get_date(obj, "date_stored"),
-        "date-asc": lambda obj: get_date(obj, "date_created")
-        or get_date(obj, "date_stored"),
-        "transcripts": lambda obj: -len(getattr(obj, "transcripts", [])),
-        "transcripts-asc": lambda obj: len(getattr(obj, "transcripts", [])),
-        "tokens": lambda obj: -getattr(obj, "metadata", {}).get("token_count", 0),
-        "tokens-asc": lambda obj: getattr(obj, "metadata", {}).get("token_count", 0),
-    }
+    def sort_key_generator(obj, sort_field):
+        if sort_field in ["created", "modified", "stored"]:
+            return get_date(obj, f"date_{sort_field}")
+        elif sort_field == "transcripts":
+            return len(getattr(obj, "transcripts", []))
+        elif sort_field == "segments":
+            if obj.__class__.__name__ == "Chat":
+                return len(getattr(obj, "messages", []))
+            elif obj.__class__.__name__ == "Voice":
+                return round(
+                    sum(map(len, (t["nodes"] for t in obj.transcripts or [])))
+                    / (len(obj.transcripts) or 1)
+                )
+            return 0
+        elif sort_field == "class":
+            return obj.__class__.__name__
+        elif sort_field == "processed":
+            return len(getattr(obj, "speech_data", []))
+        return None
 
-    media_objects.sort(key=sort_keys[sort])
+    if sort:
+        # sort by specified field(s)
+        sort_criteria = sort.split(",")
+        for criterion in reversed(sort_criteria):
+            sort_parts = criterion.split(":")
+            sort_field = sort_parts[0]
+            sort_order = sort_parts[1] if len(sort_parts) > 1 else "desc"
+            reverse_order = sort_order == "desc"
+
+            if sort_field not in [
+                "created",
+                "modified",
+                "stored",
+                "class",
+                "segments",
+                "transcripts",
+                "processed",
+            ]:
+                raise ValueError(f"Invalid sort field: {sort_field}")
+
+            media_objects.sort(
+                key=lambda obj, field=sort_field: sort_key_generator(obj, field),
+                reverse=reverse_order,
+            )
 
     table = Table(show_lines=True)
     table.add_column("ID", no_wrap=True)
@@ -413,6 +434,8 @@ def ls_command(target, library, sort, page, tags):
                 sum(map(len, (t["nodes"] for t in obj.transcripts or [])))
                 / (len(obj.transcripts) or 1)
             )
+        else:
+            segments_count = 0
 
         transcripts_count = len(getattr(obj, "transcripts", []))
         processed_count = len(getattr(obj, "speech_data", []))
