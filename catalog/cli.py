@@ -317,6 +317,7 @@ def add_command(path, library, datastore, media_class, no_copy):
 
 
 @click.command("ls")
+@click.argument("target", required=False)
 @click.option(
     "--library",
     default="~/.config/catalog/library.json",
@@ -340,20 +341,35 @@ def add_command(path, library, datastore, media_class, no_copy):
 )
 @click.option("--page", is_flag=True, help="Display results in a pager.")
 @click.option("--tags", is_flag=True, help="Display a table of available tags.")
-def ls_command(library, sort, page, tags):
-    """List media objects in a formatted table or display available tags."""
+def ls_command(target, library, sort, page, tags):
+    """List media objects or their entries (if specified by full or partial ID) in a table."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
+    console = Console()
+
     if tags:
         table = prepare_tags_table(library)
-        console = Console()
         if page:
             with console.pager():
                 console.print(table)
         else:
             console.print(table)
         return
+
+    if target:
+        parts = target.split(":")
+        media_id = parts[0]
+        entry_type = parts[1] if len(parts) > 1 else None
+
+        if entry_type:
+            table = prepare_entries_table(library, media_id, entry_type)
+            if page:
+                with console.pager():
+                    console.print(table)
+            else:
+                console.print(table)
+            return
 
     media_objects = library.media_objects
 
@@ -426,12 +442,33 @@ def ls_command(library, sort, page, tags):
             stored,
         )
 
-    console = Console()
     if page:
         with console.pager():
             console.print(table)
     else:
         console.print(table)
+
+
+def prepare_entries_table(library, media_id, entry_type):
+    table = Table(show_lines=True)
+    table.add_column("ID", no_wrap=True)
+    table.add_column("Tags", min_width=10)
+
+    media_object = next(
+        (obj for obj in library.media_objects if obj.id.startswith(media_id)), None
+    )
+    if not media_object:
+        raise ValueError(f"No media object found with ID: {media_id}")
+
+    entries = getattr(media_object, entry_type, [])
+    for entry in entries:
+        entry_id = entry.get("id", "")[:6]
+        tags = [library.get_tag_name(tag["id"]) for tag in entry.get("tags", [])]
+        tags_str = ", ".join(tags)
+
+        table.add_row(entry_id, tags_str)
+
+    return table
 
 
 def prepare_tags_table(library):
