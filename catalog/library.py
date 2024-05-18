@@ -8,6 +8,7 @@ from send2trash import send2trash
 from fuzzywuzzy import fuzz
 from datetime import datetime
 from catalog.media import MediaObject
+from catalog.utils import fetch_subtarget_entry
 from contextualize.tokenize import call_tiktoken
 import uuid
 
@@ -377,40 +378,21 @@ tags:
         }
         media_object.metadata["tags"].append(tag_data)
 
-
     def untag_object(self, media_object, tag_id):
         if "tags" in media_object.metadata:
             media_object.metadata["tags"] = [
                 tag for tag in media_object.metadata["tags"] if tag["id"] != tag_id
             ]
 
-    def fetch_subtarget_entry(self, media_object, entry_type, entry_id):
-        entries = getattr(media_object, entry_type, [])
-
-        try:
-            index = int(entry_id)
-            if index == -1:
-                return entries[-1] if entries else None
-            elif 0 <= index < len(entries):
-                return entries[index]
-            else:
-                raise ValueError(f"Index out of range: {entry_id}")
-        except ValueError:
-            entry = next((e for e in entries if e["id"].startswith(entry_id)), None)
-            if entry:
-                return entry
-            else:
-                raise ValueError(f"No {entry_type} entry found with ID: {entry_id}")
-
     def untag_entry(self, media_object, entry_type, entry_id, tag_id):
-        entry = self.fetch_subtarget_entry(media_object, entry_type, entry_id)
+        entry = fetch_subtarget_entry(media_object, entry_type, entry_id)
         if "tags" in entry:
             entry["tags"] = [tag for tag in entry["tags"] if tag["id"] != tag_id]
 
     def tag_entry(
         self, media_object, entry_type, entry_id, tag=None, tag_str=None, source="user"
     ):
-        entry = self.fetch_subtarget_entry(media_object, entry_type, entry_id)
+        entry = fetch_subtarget_entry(media_object, entry_type, entry_id)
 
         if tag_str:
             tag_id = self.get_tag_id(tag_str)
