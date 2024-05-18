@@ -99,30 +99,19 @@ def fetch_subtarget_entry(media_object, entry_type, entry_id):
             raise ValueError(f"No {entry_type} entry found with ID: {entry_id}")
 
 
-def query_subtarget(media_object, subtarget):
-    parts = subtarget.split(":", 2)
-    entry_type = parts[0]
-    entry_id = parts[1] if len(parts) > 1 else None
-    param = parts[2] if len(parts) > 2 else None
+def get_available_subtargets(media_object):
+    from catalog.media import MediaObject
 
-    if entry_type in ["transcripts", "speech_data", "processed_text"]:
-        if entry_id:
-            entry = fetch_subtarget_entry(media_object, entry_type, entry_id)
-            if param:
-                return entry.get(param)
-            elif entry_type == "speech_data":
-                return format_speech_data([entry])
-            elif entry_type == "transcripts":
-                return format_transcript_nodes([entry])
-            else:
-                return entry
-        else:
-            entries = getattr(media_object, entry_type, [])
-            if entry_type == "speech_data":
-                return format_speech_data(entries)
-            elif entry_type == "transcripts":
-                return format_transcript_nodes(entries)
-            else:
-                return entries
-    else:
-        return None
+    if not isinstance(media_object, MediaObject):
+        raise ValueError("Invalid media object")
+
+    subtargets = []
+    for attr in dir(media_object):
+        if not attr.startswith("_") and not callable(getattr(media_object, attr)):
+            value = getattr(media_object, attr)
+            if value:
+                subtargets.append(attr)
+    for key, value in media_object.metadata.items():
+        if value:
+            subtargets.append(key)
+    return subtargets

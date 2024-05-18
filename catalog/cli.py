@@ -9,10 +9,8 @@ from rich.console import Console
 from rich.table import Table
 from catalog import Library
 from catalog.process import transcribe, process_transcript
-from catalog.utils import (
-    fetch_subtarget_entry,
-    query_subtarget,
-)
+from catalog.utils import fetch_subtarget_entry, get_available_subtargets
+
 from contextualize.tokenize import call_tiktoken
 
 
@@ -35,7 +33,11 @@ def cli():
     pass
 
 
-@click.command("query")
+@click.command(
+    "query",
+    help="Query media objects by ID, property, or entry type. "
+    "Format: 'media_id[:property|entry_type[:entry_id|entry_index]]' (e.g. 'query 65317', 'query 65317:file_path', 'query 65317:transcripts', 'query 65317:transcripts:6e2', 'query 65317:speech_data:-1').",
+)
 @click.argument("target")
 @click.argument("subtarget", required=False)
 @click.option(
@@ -58,7 +60,7 @@ def cli():
     "--properties",
     "list_properties",
     is_flag=True,
-    help="List queryable properties for the target object.",
+    help="List non-empty queryable properties for the target object.",
 )
 @click.option(
     "--action",
@@ -73,37 +75,59 @@ def query_command(
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
-    media_objects = prepare_objects(library, [target])
+    parts = target.split(":")
+    media_id = parts[0]
+    property = parts[1] if len(parts) > 1 else None
+    entry_id = parts[2] if len(parts) > 2 else None
+
+    media_objects = library.fetch([media_id])
 
     if not media_objects:
-        click.echo(f"No media object found with ID: {target}")
+        click.echo(f"No media object found with ID: {media_id}")
         return
 
     media_object = media_objects[0]
 
     if list_properties:
-        subtargets = get_subtargets(media_object)
+        subtargets = get_available_subtargets(media_object)
         click.echo(
-            f"Queryable properties for {media_object.id[:5]} ({media_object.__class__.__name__}):"
+            f"Available properties for {media_object.id[:5]} ({media_object.__class__.__name__}):"
         )
         click.echo("\n".join(subtargets))
         return
 
-    if subtarget:
-        result = query_subtarget(media_object, subtarget)
-        if result is None:
-            click.echo(f"Invalid subtarget: {subtarget}")
-            return
-        query_result = result
+    if property:
+        if entry_id:
+            # entry queries (media_id:entry_type:entry_id)
+            try:
+                entry = fetch_subtarget_entry(media_object, property, entry_id)
+                result = format_entry(entry, property)
+            except ValueError as e:
+                click.echo(str(e))
+                return
+        else:
+            # property queries (including transcripts/speech_data)
+            entries = getattr(media_object, property, None)
+            if entries is None:
+                result = media_object.metadata.get(property)
+                if result is None:
+                    click.echo(
+                        f"Property or entry type '{property}' not found in media object."
+                    )
+                    return
+            elif property in ["transcripts", "speech_data"]:
+                result = format_entries(entries, property)
+            else:
+                result = entries
     else:
-        query_result = library.query(media_object)
+        result = library.query(media_object)
 
     if action:
         output = None  # do not output to console
         if action == "edit":
-            if isinstance(query_result, str):
+            if isinstance(result, str):
                 with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
-                    temp_file.write(query_result)
+                    temp_file.write(result)
                     temp_file_path = temp_file.name
                 os.system(f"nvim {temp_file_path} -R")
                 os.unlink(temp_file_path)
@@ -125,34 +149,75 @@ def query_command(
 
     if output:
         if output == "console":
-            click.echo(query_result)
+            click.echo(result)
         elif output == "clipboard":
-            pyperclip.copy(str(query_result))
-            token_count = call_tiktoken(str(query_result))["count"]
+            pyperclip.copy(str(result))
+            token_count = call_tiktoken(str(result))["count"]
             click.echo(f"Copied {token_count} tokens to clipboard.")
         elif output == "file":
             if not output_file:
                 click.echo("Output file path is required when --output is 'file'.")
                 return
             with open(output_file, "w") as file:
-                file.write(str(query_result))
-            token_count = call_tiktoken(str(query_result))["count"]
+                file.write(str(result))
+            token_count = call_tiktoken(str(result))["count"]
             click.echo(f"Wrote {token_count} tokens to {output_file}.")
 
 
-def get_subtargets(media_object):
-    from catalog.media import MediaObject
+def format_entry(entry, entry_type):
+    output = []
+    if entry_type == "transcripts":
+        output.append(f"id: {entry['id']}")
+        output.append(f"date stored: {entry['date_stored']}")
+        output.append(f"params: {entry['params']}")
+        output.append("tags: " + ", ".join(tag["id"] for tag in entry.get("tags", [])))
+        output.append("nodes:")
+        for node in entry["nodes"]:
+            output.append(f"  {node['content']}")
+    elif entry_type == "speech_data":
+        output.append(f"id: {entry['id']}")
+        output.append(f"date stored: {entry['date_stored']}")
+        output.append(f"source transcript: {entry['source_transcript']}")
+        output.append(f"process mode: {entry['process_mode']}")
+        output.append("parameters:")
+        for param_key, param_value in entry["processor_params"].items():
+            output.append(f"  {param_key}: {param_value}")
+        output.append("tags: " + ", ".join(tag["id"] for tag in entry.get("tags", [])))
+        output.append("\n------------\n")
+        for section in entry["sections"]:
+            output.append(f"\n## {section['label']}")
+            for index in range(section["indeces"][0], section["indeces"][1] + 1):
+                message = next(
+                    node for node in entry["nodes"] if node["index"] == index
+                )
+                depth = calculate_depth(entry["nodes"], index)
+                indent = "  " * depth
+                output.append(f"{indent}- {message['text']}")
+        output.append("\n============\n")
+    return "\n".join(output).strip()
 
-    if not isinstance(media_object, MediaObject):
-        raise ValueError("Invalid media object")
 
-    subtargets = []
-    for attr in dir(media_object):
-        if not attr.startswith("_") and not callable(getattr(media_object, attr)):
-            subtargets.append(attr)
-    for key in media_object.metadata:
-        subtargets.append(key)
-    return subtargets
+def format_entries(entries, entry_type):
+    output = []
+    for entry in entries:
+        output.append(format_entry(entry, entry_type))
+        output.append("\n")
+    return "\n".join(output).strip()
+
+
+def calculate_depth(nodes, index):
+    depth = 0
+    current_index = index
+    while current_index is not None:
+        current_node = next(
+            (node for node in nodes if node["index"] == current_index), None
+        )
+        if current_node:
+            current_index = current_node.get("parent")
+            depth += 1
+        else:
+            current_index = None
+    return depth - 1
 
 
 @click.command("transcribe")
