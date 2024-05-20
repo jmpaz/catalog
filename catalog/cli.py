@@ -35,8 +35,8 @@ def cli():
 
 @click.command(
     "query",
-    help="Query media objects by ID, property, or entry type. "
-    "Format: 'media_id[:property|entry_type[:entry_id|entry_index]]' (e.g. 'query 65317', 'query 65317:file_path', 'query 65317:transcripts', 'query 65317:transcripts:6e2', 'query 65317:speech_data:-1').",
+    help="Query media objects by ID, property, entry type, entry index/ID, or (for speech_data) section/node index(es)."
+    "Format: 'media_id[:property|entry_type[:entry_id|entry_index]]' (e.g. 'query 65317', 'query 65317:file_path', 'query 65317:transcripts', 'query 65317:transcripts:6e2', 'query 65317:speech_data', 'query 65317:speech_data:-1', 'query 65317:speech_data:-1.sections:0', 'query 65317:speech_data:-1.nodes:0-3'.",
 )
 @click.argument("target")
 @click.argument("subtarget", required=False)
@@ -68,8 +68,13 @@ def cli():
     type=click.Choice(["edit", "play"]),
     help="Perform an action on the queried object: edit text in nvim (as tempfile) or play media in mpv.",
 )
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Print the section/node indices to be fetched instead of fetching them.",
+)
 def query_command(
-    target, subtarget, library, output, output_file, list_properties, action
+    target, subtarget, library, output, output_file, list_properties, action, debug
 ):
     """Query media objects."""
     library_path = os.path.expanduser(library)
@@ -79,6 +84,19 @@ def query_command(
     media_id = parts[0]
     property = parts[1] if len(parts) > 1 else None
     entry_id = parts[2] if len(parts) > 2 else None
+
+    subfield = None
+    subfield_range = None
+
+    if entry_id and "." in entry_id:
+        entry_parts = entry_id.split(".")
+        entry_id = entry_parts[0]
+        subfield = entry_parts[1]
+        if len(entry_parts) > 2:
+            subfield_range = entry_parts[2]
+
+    if subfield and subfield_range is None and ":" in target:
+        subfield_range = target.split(":")[-1]
 
     media_objects = library.fetch([media_id])
 
@@ -98,15 +116,39 @@ def query_command(
 
     if property:
         if entry_id:
-            # entry queries (media_id:entry_type:entry_id)
-            try:
+            if subfield in ["nodes", "sections"]:
                 entry = fetch_subtarget_entry(media_object, property, entry_id)
-                result = format_entry(entry, property)
-            except ValueError as e:
-                click.echo(str(e))
-                return
+                if not entry:
+                    click.echo(f"No entry found for {entry_id}")
+                    return
+
+                if debug:
+                    click.echo(
+                        f"Debug: Querying {subfield} with range {subfield_range}"
+                    )
+                    if subfield_range:
+                        if "-" in subfield_range:
+                            start, end = map(int, subfield_range.split("-"))
+                            indices = range(start, end + 1)
+                        else:
+                            indices = [int(subfield_range)]
+                    else:
+                        indices = range(len(entry[subfield]))
+
+                    click.echo(f"Indices to be fetched: {list(indices)}")
+                    return
+
+                result = format_subfield(entry, subfield, subfield_range)
+            else:
+                # Handle entry queries (media_id:entry_type:entry_id)
+                try:
+                    entry = fetch_subtarget_entry(media_object, property, entry_id)
+                    result = format_entry(entry, property)
+                except ValueError as e:
+                    click.echo(str(e))
+                    return
         else:
-            # property queries (including transcripts/speech_data)
+            # Property queries (including transcripts/speech_data)
             entries = getattr(media_object, property, None)
             if entries is None:
                 result = media_object.metadata.get(property)
@@ -164,7 +206,29 @@ def query_command(
             click.echo(f"Wrote {token_count} tokens to {output_file}.")
 
 
+def format_entries(entries, entry_type):
+    output = []
+    for entry in entries:
+        output.append(format_entry(entry, entry_type))
+        output.append("\n")
+    return "\n".j
+
+
 def format_entry(entry, entry_type):
+    def calculate_depth(nodes, index):
+        depth = 0
+        current_index = index
+        while current_index is not None:
+            current_node = next(
+                (node for node in nodes if node["index"] == current_index), None
+            )
+            if current_node:
+                current_index = current_node.get("parent")
+                depth += 1
+            else:
+                current_index = None
+        return depth - 1
+
     output = []
     if entry_type == "transcripts":
         output.append(f"id: {entry['id']}")
@@ -197,27 +261,50 @@ def format_entry(entry, entry_type):
     return "\n".join(output).strip()
 
 
-def format_entries(entries, entry_type):
-    output = []
-    for entry in entries:
-        output.append(format_entry(entry, entry_type))
-        output.append("\n")
-    return "\n".join(output).strip()
+def format_subfield(entry, subfield, subfield_range):
+    def format_nodes(entry, subfield_range):
+        nodes = entry["nodes"]
+        selected_nodes = []
 
-
-def calculate_depth(nodes, index):
-    depth = 0
-    current_index = index
-    while current_index is not None:
-        current_node = next(
-            (node for node in nodes if node["index"] == current_index), None
-        )
-        if current_node:
-            current_index = current_node.get("parent")
-            depth += 1
+        if subfield_range:
+            if "-" in subfield_range:
+                start, end = map(int, subfield_range.split("-"))
+                selected_nodes = nodes[start : end + 1]
+            else:
+                index = int(subfield_range)
+                selected_nodes = [nodes[index]]
         else:
-            current_index = None
-    return depth - 1
+            selected_nodes = nodes
+
+        return "\n".join(node["text"] for node in selected_nodes)
+
+    def format_sections(entry, subfield_range):
+        sections = entry["sections"]
+        selected_sections = []
+
+        if subfield_range:
+            if "-" in subfield_range:
+                start, end = map(int, subfield_range.split("-"))
+                selected_sections = sections[start : end + 1]
+            else:
+                index = int(subfield_range)
+                selected_sections = [sections[index]]
+        else:
+            selected_sections = sections
+
+        result = ""
+        for section in selected_sections:
+            result += f"section {sections.index(section)}: \"{section['label']}\"\n"
+            for idx in range(section["indeces"][0], section["indeces"][1] + 1):
+                result += f"{entry['nodes'][idx]['text']}\n"
+        return result
+
+    if subfield == "nodes":
+        return format_nodes(entry, subfield_range)
+    elif subfield == "sections":
+        return format_sections(entry, subfield_range)
+    else:
+        return "Unsupported subfield type"
 
 
 @click.command("transcribe")
