@@ -143,7 +143,7 @@ def query_command(
                 # Handle entry queries (media_id:entry_type:entry_id)
                 try:
                     entry = fetch_subtarget_entry(media_object, property, entry_id)
-                    result = format_entry(entry, property)
+                    result = format_entry(entry, property, library)
                 except ValueError as e:
                     click.echo(str(e))
                     return
@@ -158,7 +158,7 @@ def query_command(
                     )
                     return
             elif property in ["transcripts", "speech_data"]:
-                result = format_entries(entries, property)
+                result = format_entries(entries, property, library)
             else:
                 result = entries
     else:
@@ -206,15 +206,15 @@ def query_command(
             click.echo(f"Wrote {token_count} tokens to {output_file}.")
 
 
-def format_entries(entries, entry_type):
+def format_entries(entries, entry_type, library):
     output = []
     for entry in entries:
-        output.append(format_entry(entry, entry_type))
+        output.append(format_entry(entry, entry_type, library))
         output.append("\n")
-    return "\n".j
+    return "\n".join(output).strip()
 
 
-def format_entry(entry, entry_type):
+def format_entry(entry, entry_type, library):
     def calculate_depth(nodes, index):
         depth = 0
         current_index = index
@@ -234,7 +234,8 @@ def format_entry(entry, entry_type):
         output.append(f"id: {entry['id']}")
         output.append(f"date stored: {entry['date_stored']}")
         output.append(f"params: {entry['params']}")
-        output.append("tags: " + ", ".join(tag["id"] for tag in entry.get("tags", [])))
+        tags = [library.get_tag_name(tag["id"]) for tag in entry.get("tags", [])]
+        output.append("tags: " + ", ".join(tags))
         output.append("nodes:")
         for node in entry["nodes"]:
             output.append(f"  {node['content']}")
@@ -246,7 +247,8 @@ def format_entry(entry, entry_type):
         output.append("parameters:")
         for param_key, param_value in entry["processor_params"].items():
             output.append(f"  {param_key}: {param_value}")
-        output.append("tags: " + ", ".join(tag["id"] for tag in entry.get("tags", [])))
+        tags = [library.get_tag_name(tag["id"]) for tag in entry.get("tags", [])]
+        output.append("tags: " + ", ".join(tags))
         output.append("\n------------\n")
         for section in entry["sections"]:
             output.append(f"\n## {section['label']}")
