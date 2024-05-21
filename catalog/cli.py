@@ -653,6 +653,21 @@ def prepare_tags_table(library):
     table.add_column("ID", no_wrap=True)
     table.add_column("Name")
     table.add_column("Parent(s)")
+    table.add_column("Objects", justify="right")
+    table.add_column("Entries", justify="right")
+
+    tag_counts = {tag["id"]: {"objects": 0, "entries": 0} for tag in library.tags}
+
+    for obj in library.media_objects:
+        # count object tags
+        for tag in obj.metadata.get("tags", []):
+            tag_counts[tag["id"]]["objects"] += 1
+
+        # count entry tags
+        for entry_type in ["transcripts", "speech_data"]:
+            for entry in getattr(obj, entry_type, []):
+                for tag in entry.get("tags", []):
+                    tag_counts[tag["id"]]["entries"] += 1
 
     sorted_tags = sorted(library.tags, key=lambda tag: tag["name"].lower())
 
@@ -662,7 +677,14 @@ def prepare_tags_table(library):
             library.get_tag_name(parent) for parent in tag.get("parents", [])
         ]
         parent_names_str = " / ".join(parent_names)
-        table.add_row(tag["id"][:6], tag_name, parent_names_str)
+
+        table.add_row(
+            tag["id"][:6],
+            tag_name,
+            parent_names_str,
+            str(tag_counts[tag["id"]]["objects"]),
+            str(tag_counts[tag["id"]]["entries"]),
+        )
 
     return table
 
