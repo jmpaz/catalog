@@ -7,6 +7,30 @@ def read_secrets(filename="secrets.txt"):
     return secrets
 
 
+def extract_metadata(file_path):
+    import json
+    import shlex
+    import subprocess
+
+    def run_ffprobe(file_path):
+        cmd = "ffprobe -v quiet -print_format json -show_format -show_streams '{}'".format(
+            file_path
+        )
+        args = shlex.split(cmd)
+        result = subprocess.run(
+            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        return result.stdout
+
+    metadata = json.loads(run_ffprobe(file_path))
+    creation_time = (
+        metadata.get("streams", [{}])[0].get("tags", {}).get("creation_time", None)
+    )
+    duration = metadata.get("format", {}).get("duration", None)
+
+    return {"creation_time": creation_time, "duration": duration}
+
+
 def format_speech_data(speech_data, minimal=False):
     def _calculate_depth(nodes, index):
         depth = 0
