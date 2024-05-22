@@ -284,30 +284,56 @@ class Library:
             print(f"{' ' * indent}{value}")
 
     def create_pointer(self, media_object, dest_path="data/pointers"):
-        id = media_object.id
-        name = media_object.metadata.get("name")
-        if not name:
-            name = media_object.metadata.get("source_filename", "").split(".")[0]
-        obj_type = media_object.__class__.__name__
-        frontmatter = f"""---
-id:
-- {id}
-tags:
-- media/{obj_type.lower()}
----"""
-        body = media_object.text if media_object.text else ""
-        content = f"{frontmatter}\n{body}" if body else frontmatter
+        def write_file(path, name, content):
+            os.makedirs(path, exist_ok=True)
+            with open(f"{path}/{name}.md", "w") as file:
+                file.write(content)
+
+        object_id = media_object.id
+        name = (
+            media_object.metadata.get("name")
+            or media_object.metadata.get("source_filename", "").split(".")[0]
+        )
+        obj_type = media_object.__class__.__name__.lower()
+        date_prepared = datetime.now().isoformat()
+        source_filename = media_object.metadata.get("source_filename")
+
+        frontmatter = {
+            "tags": f"media/{obj_type}",
+            "obj": object_id,
+            "source_filename": source_filename,
+        }
+
+        latest_entry = None
+        if media_object.speech_data:
+            latest_entry = media_object.speech_data[-1]
+            frontmatter["speech_data"] = latest_entry["id"]
+            frontmatter["section_count"] = len(latest_entry.get("sections", []))
+            frontmatter["node_count"] = len(latest_entry.get("nodes", []))
+        elif media_object.transcripts:
+            latest_entry = media_object.transcripts[-1]
+            frontmatter["transcript"] = latest_entry["id"]
+            frontmatter["node_count"] = len(latest_entry.get("nodes", []))
+        frontmatter["prepared"] = date_prepared
+
+        frontmatter_str = (
+            "---\n"
+            + "\n".join(
+                f"{key}: {value}" for key, value in frontmatter.items() if value
+            )
+            + "\n---"
+        )
+
+        # fetch body content according to object type
+        body = (
+            media_object.get_markdown_str()
+            if hasattr(media_object, "get_markdown_str")
+            else ""
+        )
+        content = f"{frontmatter_str}\n\n{body}".strip()
 
         filename = name if name else id
-
-        self.write_file(dest_path, filename, content)
-
-    @staticmethod
-    def write_file(path, name, content):
-        path = path
-        os.makedirs(path, exist_ok=True)
-        with open(f"{path}/{name}.md", "w") as file:
-            file.write(content)
+        write_file(dest_path, filename, content)
 
     def get_tag_name(self, tag_id):
         tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
