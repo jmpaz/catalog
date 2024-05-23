@@ -4,7 +4,7 @@ import click
 import pyperclip
 import tempfile
 import yaml
-from datetime import datetime
+from datetime import datetime, timezone
 from rich.console import Console
 from rich.table import Table
 from catalog import Library
@@ -485,7 +485,6 @@ def add_command(path, library, datastore, media_class, no_copy):
     help="Sort by specified fields (created, modified, stored, class, segments, transcripts, processed). Add :asc for ascending order (e.g., stored:asc). Multiple sorts can be comma-separated (e.g., class:asc,stored).",
 )
 def ls_command(target, library, page, tags, sort):
-    """List media objects or their entries (if specified by full or partial ID) in a table."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
@@ -519,11 +518,14 @@ def ls_command(target, library, page, tags, sort):
     def get_date(obj, key):
         date = getattr(obj, "metadata", {}).get(key)
         if date:
-            return datetime.fromisoformat(date)
-        return datetime.min
+            date = datetime.fromisoformat(date)
+            if date.tzinfo is None:
+                date = date.replace(tzinfo=timezone.utc)
+            return date
+        return datetime.min.replace(tzinfo=timezone.utc)
 
     def sort_key_generator(obj, sort_field):
-        if sort_field in ["created", "modified", "stored"]:
+        if sort_field in ["created", "modified", "stored", "recorded"]:
             return get_date(obj, f"date_{sort_field}")
         elif sort_field == "transcripts":
             return len(getattr(obj, "transcripts", []))
@@ -543,29 +545,32 @@ def ls_command(target, library, page, tags, sort):
         return None
 
     if sort:
-        # sort by specified field(s)
         sort_criteria = sort.split(",")
-        for criterion in reversed(sort_criteria):
-            sort_parts = criterion.split(":")
-            sort_field = sort_parts[0]
-            sort_order = sort_parts[1] if len(sort_parts) > 1 else "desc"
-            reverse_order = sort_order == "desc"
+    else:
+        sort_criteria = ["recorded:desc"]  # default sort
 
-            if sort_field not in [
-                "created",
-                "modified",
-                "stored",
-                "class",
-                "segments",
-                "transcripts",
-                "processed",
-            ]:
-                raise ValueError(f"Invalid sort field: {sort_field}")
+    for criterion in reversed(sort_criteria):
+        sort_parts = criterion.split(":")
+        sort_field = sort_parts[0]
+        sort_order = sort_parts[1] if len(sort_parts) > 1 else "desc"
+        reverse_order = sort_order == "desc"
 
-            media_objects.sort(
-                key=lambda obj, field=sort_field: sort_key_generator(obj, field),
-                reverse=reverse_order,
-            )
+        if sort_field not in [
+            "created",
+            "modified",
+            "stored",
+            "class",
+            "segments",
+            "transcripts",
+            "processed",
+            "recorded",
+        ]:
+            raise ValueError(f"Invalid sort field: {sort_field}")
+
+        media_objects.sort(
+            key=lambda obj, field=sort_field: sort_key_generator(obj, field),
+            reverse=reverse_order,
+        )
 
     table = Table(show_lines=True)
     table.add_column("ID", no_wrap=True)
@@ -575,11 +580,11 @@ def ls_command(target, library, page, tags, sort):
     table.add_column("Segments", justify="right")
     table.add_column("Transcripts", justify="right")
     table.add_column("Processed", justify="right")
-    table.add_column("Date Created", justify="right")
+    table.add_column("Date Recorded", justify="right")
     table.add_column("Date Stored", justify="right")
 
     for obj in media_objects:
-        created = obj.metadata.get("date_created", "")
+        recorded = obj.metadata.get("date_recorded", "")
         stored = obj.metadata.get("date_stored", "")
         if obj.__class__.__name__ == "Chat":
             segments_count = len(getattr(obj, "messages", []))
@@ -600,8 +605,8 @@ def ls_command(target, library, page, tags, sort):
         )
         people_str = ", ".join(people)
 
-        if created:
-            created = datetime.fromisoformat(created).strftime("%Y-%m-%d %H:%M:%S")
+        if recorded:
+            recorded = datetime.fromisoformat(recorded).strftime("%Y-%m-%d %H:%M:%S")
         if stored:
             stored = datetime.fromisoformat(stored).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -615,7 +620,7 @@ def ls_command(target, library, page, tags, sort):
             str(segments_count),
             str(transcripts_count),
             str(processed_count),
-            created,
+            recorded,
             stored,
         )
 

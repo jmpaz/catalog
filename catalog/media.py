@@ -5,7 +5,8 @@ import tempfile
 import yt_dlp
 from abc import ABC
 from catalog.process import format_transcript
-from catalog.utils import format_speech_data, format_transcript_nodes
+from catalog.utils import format_speech_data, format_transcript_nodes, extract_metadata
+
 from contextualize.reference import process_text as delimit_text
 
 
@@ -204,6 +205,12 @@ class Audio(MediaObject):
 class Voice(Audio):
     def __init__(self, file_path=None, url=None, name=None, source_filename=None):
         super().__init__(file_path, url, name)
+
+    def set_timestamp(self):
+        if "date_recorded" not in self.metadata:
+            metadata = extract_metadata(self.file_path)
+            if metadata and metadata.get("creation_time"):
+                self.metadata["date_recorded"] = metadata["creation_time"]
 
 
 class Chat(MediaObject):

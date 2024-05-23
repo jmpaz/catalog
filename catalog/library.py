@@ -118,6 +118,11 @@ class Library:
             )
             media_object.md5_hash = md5_hash
 
+            from catalog.media import Voice
+
+            if isinstance(media_object, Voice):
+                media_object.set_timestamp()
+
             existing_object = self.fetch_object_by_hash(md5_hash)
             if existing_object:
                 print(
@@ -454,6 +459,7 @@ class Library:
                     else media_object.metadata.get("date_modified")
                 ),
                 "date_stored": media_object.metadata.get("date_stored"),
+                "date_recorded": media_object.metadata.get("date_recorded"),
                 "source_filename": media_object.metadata.get("source_filename"),
                 "tags": media_object.metadata.get("tags", []),
             },
@@ -505,7 +511,7 @@ class Library:
 
         # set metadata
         for key, value in serialized_data["metadata"].items():
-            if key in ["date_created", "date_modified"]:
+            if key in ["date_created", "date_modified", "date_recorded"]:
                 media_object.metadata[key] = (
                     datetime.fromisoformat(value)
                     if value and isinstance(value, str)
