@@ -4,5 +4,6 @@ yt-dlp>=2024.3.10
 click>=8.1.7
 rich>=13.7.1
 fuzzywuzzy>=0.18.0
+python_Levenshtein
 pyperclip>=1.8.2
 send2trash>=1.8.3
