@@ -222,6 +222,13 @@ class Library:
             token_count = call_tiktoken(media_object.text)["count"]
             output.append(f"text: Exists ({token_count} tokens)")
 
+        if media_object.metadata.get("tags"):
+            tags = [
+                self.get_tag_name(tag["id"])
+                for tag in media_object.metadata.get("tags")
+            ]
+            output.append(f"tags: {', '.join(tags)}")
+
         if media_object.processed_text:
             output.append(f"processed_text: {len(media_object.processed_text)} entries")
 
