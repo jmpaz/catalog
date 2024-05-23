@@ -374,27 +374,40 @@ class Library:
         return tag_id
 
     def get_tag_id(self, target):
+        # check if target is already a tag ID
         if target in [tag["id"] for tag in self.tags]:
             return target
 
         target_parts = target.split("/")
-        best_match = None
-        best_ratio = 0
+        potential_matches = []
 
+        # find potential matches by name/parentage
         for tag in self.tags:
-            tag_parts = [tag["name"]] + [
-                self.get_tag_name(parent) for parent in tag.get("parents", [])
-            ]
-            if len(target_parts) != len(tag_parts):
-                continue
+            tag_parts = [tag["name"]]
+            parent_ids = tag.get("parents", [])
 
-            ratio = fuzz.ratio(" ".join(target_parts), " ".join(tag_parts))
-            if ratio > best_ratio:
-                best_match = tag["id"]
-                best_ratio = ratio
+            while parent_ids:
+                parent_id = parent_ids[0]
+                parent_tag = next((t for t in self.tags if t["id"] == parent_id), None)
+                if parent_tag:
+                    tag_parts.insert(0, parent_tag["name"])
+                    parent_ids = parent_tag.get("parents", [])
+                else:
+                    break
 
-        if best_ratio >= 80:
-            return best_match
+            # check if the base name matches
+            if target_parts[-1] == tag_parts[-1]:
+                potential_matches.append((tag["id"], "/".join(tag_parts)))
+
+        if len(potential_matches) == 1:
+            return potential_matches[0][0]
+        elif len(potential_matches) > 1:
+            conflict_details = "\n".join(
+                [f"{match[1]} (ID: {match[0]})" for match in potential_matches]
+            )
+            raise ValueError(
+                f"Multiple matches found for tag '{target}':\n{conflict_details}"
+            )
         else:
             raise ValueError(f"No close match found for tag: {target}")
 
