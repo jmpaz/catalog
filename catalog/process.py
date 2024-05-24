@@ -17,8 +17,7 @@ def transcribe(
     initial_prompt=None,
 ):
     import whisperx
-    import torch
-    import gc
+    from catalog.utils import clear_memory
 
     if not hasattr(audio_obj, "can_transcribe"):
         raise ValueError("This media object cannot be transcribed")
@@ -86,9 +85,8 @@ def transcribe(
     }
     audio_obj.transcripts.append(transcription)
 
-    gc.collect()
-    torch.cuda.empty_cache()
-    del model_a
+    del model, model_a, metadata
+    clear_memory()
 
 
 def format_transcript(

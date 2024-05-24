@@ -7,6 +7,14 @@ def read_secrets(filename="secrets.txt"):
     return secrets
 
 
+def clear_memory():
+    import gc
+    import torch
+
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
 def extract_metadata(file_path):
     import json
     import shlex

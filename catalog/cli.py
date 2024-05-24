@@ -3,6 +3,7 @@ import sys
 import click
 import pyperclip
 import tempfile
+import contextlib
 import yaml
 from datetime import datetime, timezone
 from rich.console import Console
@@ -330,6 +331,7 @@ def format_subfield(entry, subfield, subfield_range):
 @click.option("--diarize", is_flag=True, help="Enable diarization.")
 @click.option("--speaker-count", type=int, help="Number of speakers for diarization.")
 @click.option("--device-index", type=int, default=0)
+@click.option("--batch-size", type=int, default=16)
 @click.option(
     "--no-copy",
     is_flag=True,
@@ -348,6 +350,7 @@ def transcribe_command(
     speaker_count,
     model,
     prompt,
+    batch_size,
     device_index,
     no_copy,
     force,
@@ -358,10 +361,9 @@ def transcribe_command(
     library = Library(library_path, datastore_path)
 
     media_objects = prepare_objects(library, query)
-    transcribe_queue = [obj for obj in media_objects if obj.can_transcribe()]
-    click.echo(f"Media objects to transcribe: {len(transcribe_queue)}")
+    click.echo(f"Media objects to transcribe: {len(media_objects)}")
 
-    for media_object in transcribe_queue:
+    for media_object in media_objects:
         if not force and media_object.transcripts:
             num_transcripts = len(media_object.transcripts)
             if not click.confirm(
@@ -377,23 +379,28 @@ def transcribe_command(
         click.echo(f"Starting transcription for {media_object.id[:5]}...")
 
         try:
-            transcribe(
-                media_object,
-                diarize=diarize,
-                speaker_count=speaker_count,
-                whisper_version=model,
-                initial_prompt=prompt,
-                device_index=device_index,
-            )
+            with tempfile.TemporaryFile(mode="w+") as f:
+                with contextlib.redirect_stdout(f), contextlib.redirect_stderr(f):
+                    transcribe(
+                        media_object,
+                        diarize=diarize,
+                        speaker_count=speaker_count,
+                        whisper_version=model,
+                        initial_prompt=prompt,
+                        batch_size=batch_size,
+                        device_index=device_index,
+                    )
         except ValueError as e:
+            from catalog.utils import clear_memory
+
             click.echo(f"Error transcribing {media_object.id[:5]}: {str(e)}")
+            clear_memory()
             continue
 
-        click.echo(f"Transcription completed for {media_object.id[:5]}.")
+        click.echo("Transcription completed.")
 
-        media_object.set_text()
-        token_count = call_tiktoken(media_object.text)["count"]
-        click.echo(f"Token count for {media_object.id[:5]}: {token_count}")
+        token_count = call_tiktoken(media_object.get_markdown_str())["count"]
+        click.echo(f"Token count: {token_count}")
 
     try:
         library.save_library()
@@ -923,9 +930,6 @@ def tag_command(target, tag_str, library, remove):
         click.echo(f"Error: {str(e)}")
     except Exception as e:
         click.echo(f"Unexpected error: {str(e)}")
-
-
-cli.add_command(tag_command)
 
 
 cli.add_command(query_command)
