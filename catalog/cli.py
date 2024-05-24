@@ -839,7 +839,7 @@ def process_command(targets, library, transcript, config):
         try:
             process_transcript(media_object, transcript, sim_params)
             click.echo(f"Processed transcript for {media_object.id[:5]}")
-        except ValueError as e:
+        except Exception as e:
             click.echo(
                 f"Error processing transcript for {media_object.id[:5]}: {str(e)}"
             )
