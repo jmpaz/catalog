@@ -801,7 +801,7 @@ def markdown_pointers_command(targets, library, output_dir):
 
 
 @click.command("process")
-@click.argument("id")
+@click.argument("targets", nargs=-1)
 @click.option(
     "--library",
     default="~/.config/catalog/library.json",
@@ -813,18 +813,16 @@ def markdown_pointers_command(targets, library, output_dir):
     type=click.Path(exists=True),
     help="Path to a YAML configuration file containing processing parameters.",
 )
-def process_command(id, library, transcript, config):
+def process_command(targets, library, transcript, config):
     """Process a media object's data (only transcripts currently supported) using a specified configuration."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
-    media_objects = prepare_objects(library, [id])
-
-    if not media_objects:
-        click.echo(f"No media object found with ID: {id}")
+    if not targets:
+        click.echo("Error: At least one target must be provided.")
         return
 
-    media_object = media_objects[0]
+    media_objects = prepare_objects(library, targets)
 
     if not config:
         click.echo("Error: --config must be provided.")
@@ -837,11 +835,15 @@ def process_command(id, library, transcript, config):
         click.echo(f"Error loading configuration file: {str(e)}")
         return
 
-    try:
-        process_transcript(media_object, transcript, sim_params)
-        click.echo(f"Processed transcript for {media_object.id[:5]}")
-    except ValueError as e:
-        click.echo(f"Error processing transcript: {str(e)}")
+    for media_object in media_objects:
+        try:
+            process_transcript(media_object, transcript, sim_params)
+            click.echo(f"Processed transcript for {media_object.id[:5]}")
+        except ValueError as e:
+            click.echo(
+                f"Error processing transcript for {media_object.id[:5]}: {str(e)}"
+            )
+            continue
 
     try:
         library.save_library()
