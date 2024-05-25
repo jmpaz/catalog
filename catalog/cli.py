@@ -934,6 +934,68 @@ def tag_command(target, tag_str, library, remove):
         click.echo(f"Unexpected error: {str(e)}")
 
 
+@click.command("search")
+@click.argument("query")
+@click.option(
+    "--mode",
+    type=click.Choice(["exact", "fuzzy"]),
+    default="exact",
+    help="Search mode: 'exact' (default) or 'fuzzy'.",
+)
+@click.option(
+    "--max-results",
+    type=int,
+    default=10,
+    help="Maximum number of results to return (default: 10).",
+)
+@click.option(
+    "--threshold",
+    type=int,
+    default=80,
+    help="Minimum match score for fuzzy search (default: 80).",
+)
+@click.option(
+    "--cs",
+    "case_sensitive",
+    is_flag=True,
+    default=False,
+    help="Search case-sensitive (default: False).",
+)
+@click.option(
+    "--search-all",
+    is_flag=True,
+    default=False,
+    help="Search through all entries (default: False).",
+)
+@click.option(
+    "--library",
+    default="~/.config/catalog/library.json",
+    help="Path to library file (default: ~/.config/catalog/library.json).",
+)
+def search_command(
+    query, mode, max_results, threshold, case_sensitive, search_all, library
+):
+    """Search media objects in the library."""
+    library_path = os.path.expanduser(library)
+    library = Library(library_path)
+
+    search_results = library.search(
+        query=query,
+        mode=mode,
+        max_results=max_results,
+        threshold=threshold,
+        ignore_case=not case_sensitive,
+        full_search=search_all,
+    )
+
+    if not search_results:
+        click.echo("No results found.")
+        return
+
+    for result, locator in search_results:
+        click.echo(f"- {result} ({locator})")
+
+
 cli.add_command(query_command)
 cli.add_command(transcribe_command)
 cli.add_command(add_command)
@@ -943,3 +1005,4 @@ cli.add_command(markdown_pointers_command)
 cli.add_command(process_command)
 cli.add_command(export_command)
 cli.add_command(tag_command)
+cli.add_command(search_command)
