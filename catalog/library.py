@@ -5,7 +5,7 @@ import shutil
 import json
 import hashlib
 from send2trash import send2trash
-from fuzzywuzzy import fuzz
+from fuzzywuzzy import process as fuzzy_process
 from datetime import datetime
 from catalog.media import MediaObject
 from catalog.utils import fetch_subtarget_entry
@@ -249,6 +249,84 @@ class Library:
             output.append(f"chat_metadata: {len(media_object.chat_metadata)} entries")
 
         return "\n".join(output)
+
+    def search(
+        self,
+        query,
+        mode="exact",
+        max_results=10,
+        threshold=80,
+        ignore_case=True,
+        full_search=False,
+    ):
+        def _exact_search(entry, query, results, media_id, entry_type, ignore_case):
+            if "nodes" in entry:
+                for index, node in enumerate(entry["nodes"]):
+                    content_key = "content" if "content" in node else "text"
+                    content = (
+                        node[content_key].lower() if ignore_case else node[content_key]
+                    )
+                    if query in content:
+                        locator = f"{media_id[:8]}:{entry_type}:{entry['id'][:5]}.nodes:{index}"
+                        results.append((node[content_key], locator))
+
+        def _fuzzy_search(
+            entry, query, results, media_id, entry_type, threshold, ignore_case
+        ):
+            if "nodes" in entry:
+                nodes_content = [
+                    node["content"] if "content" in node else node["text"]
+                    for node in entry["nodes"]
+                ]
+                search_results = fuzzy_process.extract(
+                    query, nodes_content, limit=len(nodes_content)
+                )
+                for result in search_results:
+                    node_index = nodes_content.index(result[0])
+                    if result[1] >= threshold:
+                        locator = f"{media_id[:8]}:{entry_type}:{entry['id'][:5]}.nodes:{node_index}"
+                        results.append((result[0], locator))
+
+        results = []
+        entries_to_search = []
+
+        # search recent entry (speech_data/transcript) or all entries (full_search)
+        for media_object in self.media_objects:
+            if full_search:
+                if hasattr(media_object, "speech_data"):
+                    for entry in media_object.speech_data:
+                        entries_to_search.append(
+                            (media_object.id, "speech_data", entry)
+                        )
+                if hasattr(media_object, "transcripts"):
+                    for entry in media_object.transcripts:
+                        entries_to_search.append(
+                            (media_object.id, "transcripts", entry)
+                        )
+            else:
+                if hasattr(media_object, "speech_data") and media_object.speech_data:
+                    entries_to_search.append(
+                        (media_object.id, "speech_data", media_object.speech_data[-1])
+                    )
+                elif hasattr(media_object, "transcripts") and media_object.transcripts:
+                    entries_to_search.append(
+                        (media_object.id, "transcripts", media_object.transcripts[-1])
+                    )
+
+        query = query.lower() if ignore_case else query
+
+        for media_id, entry_type, entry in entries_to_search:
+            if mode == "exact":
+                _exact_search(entry, query, results, media_id, entry_type, ignore_case)
+            elif mode == "fuzzy":
+                _fuzzy_search(
+                    entry, query, results, media_id, entry_type, threshold, ignore_case
+                )
+
+            if len(results) >= max_results:
+                break
+
+        return results[:max_results]
 
     def fetch(self, ids=None):
         """Fetch media objects by ID."""
