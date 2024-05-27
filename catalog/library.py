@@ -206,7 +206,12 @@ class Library:
 
         output.append(f"object_class: {media_object.__class__.__name__}")
 
-        for date_key in ["date_stored", "date_created", "date_modified"]:
+        for date_key in [
+            "date_created",
+            "date_modified",
+            "date_stored",
+            "date_recorded",
+        ]:
             date_value = media_object.metadata.get(date_key)
             if date_value:
                 output.append(f"{date_key}: {date_value}")
