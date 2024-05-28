@@ -1,0 +1,65 @@
+# Embeddings
+
+```python
+from catalog import Library
+from catalog.embed import load_embeddings, vector_search
+import numpy as np
+
+def print_results(search_results):
+    for i, result in enumerate(search_results, 1):
+        print(f"{i}: {result}")
+
+def check_embeddings():
+    if embeddings.size == 0 or len(locators) == 0:
+        print("No embeddings loaded.")
+    else:
+        print(f"{len(locators)} embeddings loaded.")
+
+library = Library()
+```
+
+### Generate embeddings
+```python
+from catalog.embed import prepare_embeddings
+
+# embeddings, locators = prepare_embeddings(library, max_entries=400, device='gpu')
+check_embeddings()
+```
+
+```python
+from catalog.utils import clear_memory
+
+clear_memory()
+```
+
+
+### Load embeddings
+```python
+# Load embeddings from disk (~/.local/share/catalog/embeddings.json)
+embeddings, locators = load_embeddings()
+check_embeddings()
+
+```
+
+## Search
+```py
+# search for similar entries
+query = "might need to also wrap that in some instruction"
+vector_search_results = vector_search(query, embeddings, locators, top_k=10, device='gpu')
+
+print("Vector Search Results:")
+print_results(vector_search_results)
+```
+
+
+## Reconcile
+```py
+from catalog.embed import reconcile_embeddings, load_embeddings, vector_search
+
+# reconcile embeddings (update with new entries and remove old ones)
+reconcile_embeddings(library, device='gpu')
+
+# load updated embeddings from disk
+embeddings, locators = load_embeddings()
+
+```
