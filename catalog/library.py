@@ -457,14 +457,30 @@ class Library:
         return tag_id
 
     def get_tag_id(self, target):
-        # check if target is already a tag ID
+        # check if target is a full ID
         if target in [tag["id"] for tag in self.tags]:
             return target
 
+        # check if target is a partial ID of >= 5 characters
+        if len(target) >= 5:
+            partial_matches = [tag for tag in self.tags if tag["id"].startswith(target)]
+            if len(partial_matches) == 1:
+                return partial_matches[0]["id"]
+            elif len(partial_matches) > 1:
+                conflict_details = "\n".join(
+                    [
+                        f"{match['name']} (ID: {match['id']})"
+                        for match in partial_matches
+                    ]
+                )
+                raise ValueError(
+                    f"Multiple matches found for tag '{target}':\n{conflict_details}"
+                )
+
+        # find potential matches by name/parentage
         target_parts = target.split("/")
         potential_matches = []
 
-        # find potential matches by name/parentage
         for tag in self.tags:
             tag_parts = [tag["name"]]
             parent_ids = tag.get("parents", [])
@@ -479,7 +495,7 @@ class Library:
                     break
 
             # check if the base name matches
-            if target_parts[-1] == tag_parts[-1]:
+            if target_parts[-1].lower() == tag_parts[-1].lower():
                 potential_matches.append((tag["id"], "/".join(tag_parts)))
 
         if len(potential_matches) == 1:
