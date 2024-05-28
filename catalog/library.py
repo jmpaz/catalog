@@ -393,8 +393,17 @@ class Library:
         date_prepared = datetime.now().isoformat()
         source_filename = media_object.metadata.get("source_filename")
 
+        if media_object.metadata.get("tags"):
+            tags = [
+                self.get_tag_name(tag["id"])
+                for tag in media_object.metadata.get("tags")
+            ]
+            tags_str = f"{f'media/{obj_type}'}, {', '.join(tags)}"
+        else:
+            tags_str = f"media/{obj_type}"
+
         frontmatter = {
-            "tags": f"media/{obj_type}",
+            "tags": tags_str,
             "obj": object_id,
             "source_filename": source_filename,
         }
