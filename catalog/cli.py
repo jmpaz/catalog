@@ -10,8 +10,8 @@ from rich.console import Console
 from rich.table import Table
 from catalog import Library
 from catalog.process import transcribe, process_transcript
+from catalog.embed import load_embeddings, reconcile_embeddings, vector_search
 from catalog.utils import fetch_subtarget_entry, get_available_subtargets
-
 from contextualize.tokenize import call_tiktoken
 
 
@@ -938,9 +938,9 @@ def tag_command(target, tag_str, library, remove):
 @click.argument("query")
 @click.option(
     "--mode",
-    type=click.Choice(["exact", "fuzzy"]),
+    type=click.Choice(["exact", "fuzzy", "embeddings"]),
     default="exact",
-    help="Search mode: 'exact' (default) or 'fuzzy'.",
+    help="Search mode: 'exact' (default), 'fuzzy', or 'embeddings'.",
 )
 @click.option(
     "--max-results",
@@ -968,32 +968,64 @@ def tag_command(target, tag_str, library, remove):
     help="Search through all entries (default: False).",
 )
 @click.option(
+    "--sync",
+    is_flag=True,
+    default=False,
+    help="Synchronize embeddings before search (default: False).",
+)
+@click.option(
     "--library",
     default="~/.config/catalog/library.json",
     help="Path to library file (default: ~/.config/catalog/library.json).",
 )
+@click.option(
+    "-e",
+    "--embeddings",
+    "use_embeddings",
+    is_flag=True,
+    help="Use embeddings mode for vector search.",
+)
 def search_command(
-    query, mode, max_results, threshold, case_sensitive, search_all, library
+    query,
+    mode,
+    max_results,
+    threshold,
+    case_sensitive,
+    search_all,
+    sync,
+    library,
+    use_embeddings,
 ):
     """Search media objects in the library."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
-    search_results = library.search(
-        query=query,
-        mode=mode,
-        max_results=max_results,
-        threshold=threshold,
-        ignore_case=not case_sensitive,
-        full_search=search_all,
-    )
+    if sync:
+        click.echo("Updating embeddings...")
+        reconcile_embeddings(library, device="gpu")
+
+    if use_embeddings or mode == "embeddings":
+        embeddings, locators = load_embeddings()
+        search_results = vector_search(
+            query, embeddings, locators, top_k=max_results, device="gpu"
+        )
+        for i, result in enumerate(search_results, 1):
+            click.echo(f"- {result[0]}")
+    else:
+        search_results = library.search(
+            query=query,
+            mode=mode,
+            max_results=max_results,
+            threshold=threshold,
+            ignore_case=not case_sensitive,
+            full_search=search_all,
+        )
+        for result, locator in search_results:
+            click.echo(f"- {result} ({locator})")
 
     if not search_results:
         click.echo("No results found.")
         return
-
-    for result, locator in search_results:
-        click.echo(f"- {result} ({locator})")
 
 
 cli.add_command(query_command)
