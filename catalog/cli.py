@@ -688,7 +688,7 @@ def prepare_tags_table(library):
         parent_names = [
             library.get_tag_name(parent) for parent in tag.get("parents", [])
         ]
-        parent_names_str = " / ".join(parent_names)
+        parent_names_str = ", ".join(parent_names)
 
         table.add_row(
             tag["id"][:6],
@@ -934,6 +934,88 @@ def tag_command(target, tag_str, library, remove):
         click.echo(f"Unexpected error: {str(e)}")
 
 
+@click.command("tags")
+@click.argument(
+    "action",
+    type=click.Choice(["create", "delete", "rename", "set-parent", "remove-parent"]),
+)
+@click.argument("tag_str", required=False)
+@click.argument("param", required=False)
+@click.option(
+    "--library",
+    default="~/.config/catalog/library.json",
+    help="Path to library file (default: ~/.config/catalog/library.json).",
+)
+@click.option(
+    "--parent",
+    "-p",
+    help="Parent tag name or ID to set or remove.",
+)
+def manage_tag_command(action, tag_str, param, library, parent):
+    """Manage tags: create, delete, rename, set-parent, or remove-parent."""
+    library_path = os.path.expanduser(library)
+    library = Library(library_path)
+
+    try:
+        if action == "create":
+            parent_id = library.get_tag_id(parent) if parent else None
+            library.create_tag(tag_str, parent_id)
+            library.save_library()
+            click.echo(f"Tag '{tag_str}' created successfully.")
+            return
+
+        tag_id = library.get_tag_id(tag_str)
+
+        if action == "delete":
+            assignments_count = library.count_tag_assignments(tag_id)
+            if not click.confirm(
+                f"Tag '{tag_str}' is assigned to {assignments_count} items. Do you want to delete it?"
+            ):
+                return
+            library.delete_tag(tag_id)
+            library.save_library()
+            click.echo(f"Tag '{tag_str}' deleted successfully.")
+            return
+
+        if action == "rename":
+            if not param:
+                click.echo("Error: New name is required to rename a tag.")
+                return
+            library.rename_tag(tag_id, param)
+            library.save_library()
+            click.echo(f"Tag '{tag_str}' renamed to '{param}' successfully.")
+            return
+
+        if action == "set-parent":
+            parent_id = library.get_tag_id(parent or param)
+            if not parent_id:
+                click.echo("Error: Parent tag is required to set a parent tag.")
+                return
+            library.add_parent_tag(tag_id, parent_id)
+            library.save_library()
+            click.echo(
+                f"Parent tag '{parent or param}' added to '{tag_str}' successfully."
+            )
+            return
+
+        if action == "remove-parent":
+            parent_id = library.get_tag_id(parent or param)
+            if not parent_id:
+                click.echo("Error: Parent tag is required to remove a parent tag.")
+                return
+            library.remove_parent_tag(tag_id, parent_id)
+            library.save_library()
+            click.echo(
+                f"Parent tag '{parent or param}' removed from '{tag_str}' successfully."
+            )
+            return
+
+    except ValueError as e:
+        click.echo(f"Error: {str(e)}")
+    except Exception as e:
+        click.echo(f"Unexpected error: {str(e)}")
+
+
 @click.command("search")
 @click.argument("query")
 @click.option(
@@ -1037,4 +1119,5 @@ cli.add_command(markdown_pointers_command)
 cli.add_command(process_command)
 cli.add_command(export_command)
 cli.add_command(tag_command)
+cli.add_command(manage_tag_command)
 cli.add_command(search_command)

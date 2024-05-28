@@ -446,7 +446,56 @@ class Library:
 
         return "/".join(parts)
 
+    def count_tag_assignments(self, tag_id):
+        count = 0
+        for obj in self.media_objects:
+            if any(tag["id"] == tag_id for tag in obj.metadata.get("tags", [])):
+                count += 1
+            for entry_type in ["transcripts", "speech_data"]:
+                for entry in getattr(obj, entry_type, []):
+                    if any(tag["id"] == tag_id for tag in entry.get("tags", [])):
+                        count += 1
+        return count
+
+    def delete_tag(self, tag_id):
+        self.tags = [tag for tag in self.tags if tag["id"] != tag_id]
+        for obj in self.media_objects:
+            if "tags" in obj.metadata:
+                obj.metadata["tags"] = [
+                    tag for tag in obj.metadata["tags"] if tag["id"] != tag_id
+                ]
+            for entry_type in ["transcripts", "speech_data"]:
+                for entry in getattr(obj, entry_type, []):
+                    if "tags" in entry:
+                        entry["tags"] = [
+                            tag for tag in entry["tags"] if tag["id"] != tag_id
+                        ]
+
+    def rename_tag(self, tag_id, new_name):
+        tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
+        if tag:
+            tag["name"] = new_name
+        else:
+            raise ValueError(f"No tag found with ID: {tag_id}")
+
+    def add_parent_tag(self, tag_id, parent_id):
+        tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
+        if tag:
+            if parent_id not in tag["parents"]:
+                tag["parents"].append(parent_id)
+        else:
+            raise ValueError(f"No tag found with ID: {tag_id}")
+
+    def remove_parent_tag(self, tag_id, parent_id):
+        tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
+        if tag:
+            tag["parents"] = [pid for pid in tag["parents"] if pid != parent_id]
+        else:
+            raise ValueError(f"No tag found with ID: {tag_id}")
+
     def create_tag(self, name, parent=None):
+        if any(tag["name"].lower() == name.lower() for tag in self.tags):
+            raise ValueError(f"Tag '{name}' already exists.")
         tag_id = str(uuid.uuid4())
         tag = {
             "id": tag_id,
