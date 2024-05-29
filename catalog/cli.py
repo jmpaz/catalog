@@ -1122,6 +1122,25 @@ def search_command(
         return
 
 
+@click.command(
+    "edit",
+    help="Set the content of a node within an entry to a new value. Usage: catalog edit [locator] '[updated/corrected value]'.",
+)
+@click.argument("locator")
+@click.argument("new_content")
+def edit_command(locator, new_content):
+    """Edit the content of a specific node within a media object entry."""
+    from catalog.utils import update_node_content
+
+    try:
+        update_node_content(locator, new_content)
+        click.echo("Node content updated successfully.")
+    except ValueError as e:
+        click.echo(f"Error: {str(e)}")
+    except Exception as e:
+        click.echo(f"Unexpected error: {str(e)}")
+
+
 cli.add_command(query_command)
 cli.add_command(transcribe_command)
 cli.add_command(add_command)
@@ -1133,3 +1152,4 @@ cli.add_command(export_command)
 cli.add_command(tag_command)
 cli.add_command(manage_tag_command)
 cli.add_command(search_command)
+cli.add_command(edit_command)

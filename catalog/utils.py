@@ -147,3 +147,87 @@ def get_available_subtargets(media_object):
         if value:
             subtargets.append(key)
     return subtargets
+
+
+def update_node_content(locator, new_content, author="user"):
+    """Update the content of a node within a media object entry."""
+    import os
+    from datetime import datetime
+    from catalog.library import Library
+
+    def parse_node_locator(locator):
+        parts = locator.split(":")
+        if len(parts) < 3:
+            raise ValueError(
+                "Invalid locator format. Expected format: 'media_id:entry_type:entry_id.nodes:node_index'"
+            )
+
+        media_id = parts[0]
+        entry_type = parts[1]
+        entry_id_part = parts[2]
+        subfield = None
+        subfield_range = None
+
+        if "." in entry_id_part:
+            entry_parts = entry_id_part.split(".")
+            entry_id = entry_parts[0]
+            subfield = entry_parts[1]
+            if len(entry_parts) > 2:
+                subfield_range = entry_parts[2]
+
+        if subfield and subfield_range is None and ":" in locator:
+            subfield_range = locator.split(":")[-1]
+
+        if subfield != "nodes":
+            raise ValueError("Invalid subfield type. Expected 'nodes'.")
+
+        node_index = int(subfield_range) if subfield_range else None
+
+        return media_id, entry_type, entry_id, node_index
+
+    def fetch_node(library, media_id, entry_type, entry_id, node_index):
+        media_object = library.fetch([media_id])[0]
+        entry = fetch_subtarget_entry(media_object, entry_type, entry_id)
+        if "nodes" not in entry:
+            raise ValueError("Entry does not contain nodes.")
+        if node_index < 0 or node_index >= len(entry["nodes"]):
+            raise IndexError("Node index out of range.")
+        return media_object, entry, entry["nodes"][node_index]
+
+    library_path = os.path.expanduser("~/.config/catalog/library.json")
+    library = Library(library_path)
+
+    media_id, entry_type, entry_id, node_index = parse_node_locator(locator)
+    media_object, entry, node = fetch_node(
+        library, media_id, entry_type, entry_id, node_index
+    )
+
+    if "value_history" not in node:  # initialize
+        node["value_history"] = [
+            {
+                "version": 1,
+                "content": node.get("content") or node.get("text"),
+                "updated_at": node.get("updated_at"),
+                "updated_by": node.get("updated_by"),
+            }
+        ]
+        current_version = 1
+    else:
+        current_version = len(node["value_history"])
+
+    history_entry = {
+        "version": current_version + 1,
+        "content": new_content,
+        "updated_at": datetime.now().isoformat(),
+        "updated_by": author,
+    }
+
+    if "content" in node:
+        node["content"] = new_content
+    elif "text" in node:
+        node["text"] = new_content
+    else:
+        raise ValueError("Node does not have 'content' or 'text' field.")
+
+    node["value_history"].append(history_entry)
+    library.save_library()
