@@ -378,16 +378,17 @@ class Library:
         else:
             print(f"{' ' * indent}{value}")
 
-    def create_pointer(self, media_object, dest_path="data/pointers"):
+    def create_obj_pointer(self, media_object, dest_path="data/pointers"):
         def write_file(path, name, content):
             os.makedirs(path, exist_ok=True)
-            with open(f"{path}/{name}.md", "w") as file:
+            with open(os.path.join(path, name), "w") as file:
                 file.write(content)
 
         object_id = media_object.id
         name = (
             media_object.metadata.get("name")
-            or media_object.metadata.get("source_filename", "").split(".")[0]
+            or media_object.metadata.get("source_filename")
+            or object_id
         )
         obj_type = media_object.__class__.__name__.lower()
         date_prepared = datetime.now().isoformat()
@@ -428,7 +429,6 @@ class Library:
             + "\n---"
         )
 
-        # fetch body content according to object type
         body = (
             media_object.get_markdown_str()
             if hasattr(media_object, "get_markdown_str")
@@ -436,8 +436,81 @@ class Library:
         )
         content = f"{frontmatter_str}\n\n{body}".strip()
 
-        filename = name if name else id
+        filename = f"{name}.md" if not name.endswith(".md") else name
         write_file(dest_path, filename, content)
+
+    def create_tag_pointer(self, tag_id, tags_dir):
+        tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
+        if not tag:
+            print(f"No tag found with ID: {tag_id}")
+            return
+
+        # skip tags with 'meta' as an ancestor
+        current_tag = tag
+        while current_tag.get("parents"):
+            parent_id = current_tag["parents"][0]
+            parent_tag = next((t for t in self.tags if t["id"] == parent_id), None)
+            if parent_tag and parent_tag["name"].lower() == "meta":
+                print(f"Skipping tag '{tag['name']}' as it has 'meta' as an ancestor.")
+                return
+            current_tag = parent_tag
+
+        has_children = any(
+            tag_id in child_tag.get("parents", []) for child_tag in self.tags
+        )
+
+        if self.count_tag_assignments(tag_id) == 0 and not has_children:
+            print(
+                f"Skipping tag '{tag['name']}' as it has no assignments and no children."
+            )
+            return
+
+        # create tag path
+        tag_path_parts = [tag["name"]]
+        parent_id = tag.get("parents", [])
+        while parent_id:
+            parent_tag = next((t for t in self.tags if t["id"] == parent_id[0]), None)
+            if parent_tag:
+                tag_path_parts.insert(0, parent_tag["name"])
+                parent_id = parent_tag.get("parents", [])
+            else:
+                break
+        tag_path = os.path.join(tags_dir, *tag_path_parts[:-1])
+        os.makedirs(tag_path, exist_ok=True)
+
+        # create tag pointer alongside folder
+        tag_name = tag_path_parts[-1]
+        pointer_content = f"---\ntitle: {tag_name}\ntag: {tag['id']}\n---\n"
+        pointer_path = os.path.join(tag_path, f"{tag_name}.md")
+
+        try:
+            with open(pointer_path, "w") as file:
+                file.write(pointer_content)
+            print(f"Created tag pointer for {tag_name}")
+        except Exception as e:
+            print(f"Error creating tag pointer for {tag_name}: {str(e)}")
+
+        # recursively create child tags
+        for child_tag in self.tags:
+            if tag_id in child_tag.get("parents", []):
+                self.create_tag_pointer(child_tag["id"], tags_dir)
+
+        # create object pointers for objects tagged with the current tag
+        for media_object in self.media_objects:
+            if any(t["id"] == tag_id for t in media_object.metadata.get("tags", [])):
+                media_type = media_object.__class__.__name__.lower()
+                media_dir = os.path.join(tags_dir, "media", media_type)
+                os.makedirs(media_dir, exist_ok=True)
+                self.create_obj_pointer(media_object, media_dir)
+
+    def create_pointer(self, target, dest_path="data/pointers", mode="default"):
+        if mode == "quartz":
+            if isinstance(target, str) and target.startswith("tag_"):
+                self.create_tag_pointer(target, dest_path)
+            else:
+                self.create_tag_pointer(target, dest_path)
+        else:
+            self.create_obj_pointer(target, dest_path)
 
     def get_tag_name(self, tag_id):
         tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
