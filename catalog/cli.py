@@ -777,27 +777,39 @@ def rm_command(targets, library, delete_file):
     default=".",
     help="Destination path for the generated pointers (default: current directory).",
 )
-def markdown_pointers_command(targets, library, output_dir):
-    """Create Markdown files composed of specified objects' metadata and `text`.
+@click.option("--mode", type=click.Choice(["default", "quartz"]), default="default")
+def markdown_pointers_command(targets, library, output_dir, mode):
+    """Create Markdown files composed of specified objects' metadata + textual representation ('default'), or all objects, along with all associated tags ('quartz').
 
     Targets can be media object IDs or file paths (which will be imported or matched to existing objects).
     """
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
-    if not targets:
-        media_objects = library.media_objects
+    if mode == "quartz":
+        # create tag pointers
+        for tag in library.tags:
+            try:
+                library.create_pointer(tag["id"], dest_path=output_dir, mode=mode)
+            except Exception as e:
+                click.echo(f"Error creating tag pointer for {tag['name']}: {str(e)}")
     else:
-        media_objects = prepare_objects(library, targets)
+        # create object pointers
+        if not targets:
+            media_objects = library.media_objects
+        else:
+            media_objects = prepare_objects(library, targets)
 
-    for media_object in media_objects:
-        try:
-            library.create_pointer(media_object, dest_path=output_dir)
-            click.echo(
-                f"Created pointer for {media_object.id[:5]} ({media_object.__class__.__name__})"
-            )
-        except Exception as e:
-            click.echo(f"Error creating pointer for {media_object.id[:5]}: {str(e)}")
+        for media_object in media_objects:
+            try:
+                library.create_pointer(media_object, dest_path=output_dir, mode=mode)
+                click.echo(
+                    f"Created pointer for {media_object.id[:5]} ({media_object.__class__.__name__})"
+                )
+            except Exception as e:
+                click.echo(
+                    f"Error creating pointer for {media_object.id[:5]}: {str(e)}"
+                )
 
 
 @click.command("process")
