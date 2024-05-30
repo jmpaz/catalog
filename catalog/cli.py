@@ -795,18 +795,12 @@ def rm_command(targets, library, delete_file):
 def markdown_pointers_command(targets, library, output_dir, mode):
     """Create Markdown files composed of specified objects' metadata + textual representation ('default'), or all objects, along with all associated tags ('quartz').
 
-    Targets can be media object IDs or file paths (which will be imported or matched to existing objects).
-    """
+    Targets can be media object IDs or file paths (which will be imported or matched to existing objects)."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
     if mode == "quartz":
-        # create tag pointers
-        for tag in library.tags:
-            try:
-                library.create_pointer(tag["id"], dest_path=output_dir, mode=mode)
-            except Exception as e:
-                click.echo(f"Error creating tag pointer for {tag['name']}: {str(e)}")
+        library.sync_pointers(output_dir)
     else:
         # create object pointers
         if not targets:
