@@ -342,6 +342,12 @@ def format_subfield(entry, subfield, subfield_range):
     is_flag=True,
     help="Do not prompt for confirmation before transcribing media which already has transcripts.",
 )
+@click.option(
+    "--missing",
+    "process_missing",
+    is_flag=True,
+    help="Transcribe all transcribable media which do not have transcripts yet.",
+)
 def transcribe_command(
     query,
     library,
@@ -354,11 +360,19 @@ def transcribe_command(
     device_index,
     no_copy,
     force,
+    process_missing,
 ):
     """Transcribe compatible media objects."""
     library_path = os.path.expanduser(library)
     datastore_path = os.path.expanduser(datastore)
     library = Library(library_path, datastore_path)
+
+    if process_missing:
+        query = [
+            obj.id
+            for obj in library.media_objects
+            if obj.can_transcribe() and not obj.transcripts
+        ]
 
     media_objects = prepare_objects(library, query)
     click.echo(f"Media objects to transcribe: {len(media_objects)}")
@@ -825,16 +839,30 @@ def markdown_pointers_command(targets, library, output_dir, mode):
     type=click.Path(exists=True),
     help="Path to a YAML configuration file containing processing parameters.",
 )
-def process_command(targets, library, transcript, config):
+@click.option(
+    "--missing",
+    "process_missing",
+    is_flag=True,
+    help="Process all transcribed media which has not yet been processed.",
+)
+def process_command(targets, library, transcript, config, process_missing):
     """Process a media object's data (only transcripts currently supported) using a specified configuration."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
+
+    if process_missing:
+        targets = [
+            obj.id
+            for obj in library.media_objects
+            if hasattr(obj, "transcripts") and obj.transcripts and not obj.speech_data
+        ]
 
     if not targets:
         click.echo("Error: At least one target must be provided.")
         return
 
     media_objects = prepare_objects(library, targets)
+    print(f"Objects to process: {len(media_objects)}")
 
     if not config:
         click.echo("Error: --config must be provided.")
