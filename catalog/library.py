@@ -481,6 +481,8 @@ class Library:
         # create tag pointer alongside folder
         tag_name = tag_path_parts[-1]
         pointer_content = f"---\ntitle: {tag_name}\ntag: {tag['id']}\n---\n"
+        if tag.get("description"):
+            pointer_content += f"\n{tag['description']}\n"
         pointer_path = os.path.join(tag_path, f"{tag_name}.md")
 
         try:
@@ -575,7 +577,7 @@ class Library:
         else:
             raise ValueError(f"No tag found with ID: {tag_id}")
 
-    def create_tag(self, name, parent=None):
+    def create_tag(self, name, parent=None, description=""):
         if any(tag["name"].lower() == name.lower() for tag in self.tags):
             raise ValueError(f"Tag '{name}' already exists.")
         tag_id = str(uuid.uuid4())
@@ -583,6 +585,7 @@ class Library:
             "id": tag_id,
             "name": name,
             "parents": [parent] if parent else [],
+            "description": description,
         }
         self.tags.append(tag)
         return tag_id
