@@ -409,16 +409,24 @@ class Library:
             "source_filename": source_filename,
         }
 
-        latest_entry = None
-        if media_object.speech_data:
+        if hasattr(media_object, "speech_data") and media_object.speech_data:
             latest_entry = media_object.speech_data[-1]
-            frontmatter["speech_data"] = latest_entry["id"]
-            frontmatter["section_count"] = len(latest_entry.get("sections", []))
-            frontmatter["node_count"] = len(latest_entry.get("nodes", []))
-        elif media_object.transcripts:
+            frontmatter.update(
+                {
+                    "speech_data": latest_entry["id"],
+                    "section_count": len(latest_entry.get("sections", [])),
+                    "node_count": len(latest_entry.get("nodes", [])),
+                }
+            )
+        elif hasattr(media_object, "transcripts") and media_object.transcripts:
             latest_entry = media_object.transcripts[-1]
-            frontmatter["transcript"] = latest_entry["id"]
-            frontmatter["node_count"] = len(latest_entry.get("nodes", []))
+            frontmatter.update(
+                {
+                    "transcript": latest_entry["id"],
+                    "node_count": len(latest_entry.get("nodes", [])),
+                }
+            )
+
         frontmatter["prepared"] = date_prepared
 
         frontmatter_str = (
@@ -429,11 +437,11 @@ class Library:
             + "\n---"
         )
 
-        body = (
-            media_object.get_markdown_str()
-            if hasattr(media_object, "get_markdown_str")
-            else ""
-        )
+        try:
+            body = media_object.get_markdown_str()
+        except NotImplementedError:
+            body = ""
+
         content = f"{frontmatter_str}\n\n{body}".strip()
 
         filename = f"{name}.md" if not name.endswith(".md") else name
@@ -513,6 +521,122 @@ class Library:
                 self.create_tag_pointer(target, dest_path)
         else:
             self.create_obj_pointer(target, dest_path)
+
+    def update_pointer(self, pointer_path):
+        with open(pointer_path, "r") as file:
+            content = file.read()
+
+        frontmatter, body = content.split("---", 2)[1:]
+        frontmatter_lines = frontmatter.strip().split("\n")
+        metadata = {
+            line.split(": ")[0]: line.split(": ")[1] for line in frontmatter_lines
+        }
+
+        if "obj" in metadata:
+            obj_id = metadata["obj"]
+            media_object = next(
+                (obj for obj in self.media_objects if obj.id == obj_id), None
+            )
+            if media_object:
+                new_frontmatter = {
+                    "tags": metadata.get("tags"),
+                    "obj": obj_id,
+                    "source_filename": media_object.metadata.get("source_filename"),
+                    "prepared": metadata.get("prepared"),
+                }
+
+                if hasattr(media_object, "speech_data") and media_object.speech_data:
+                    latest_entry = media_object.speech_data[-1]
+                    new_frontmatter.update(
+                        {
+                            "speech_data": latest_entry["id"],
+                            "section_count": len(latest_entry.get("sections", [])),
+                            "node_count": len(latest_entry.get("nodes", [])),
+                        }
+                    )
+                elif hasattr(media_object, "transcripts") and media_object.transcripts:
+                    latest_entry = media_object.transcripts[-1]
+                    new_frontmatter.update(
+                        {
+                            "transcript": latest_entry["id"],
+                            "node_count": len(latest_entry.get("nodes", [])),
+                        }
+                    )
+
+                try:
+                    new_body = media_object.get_markdown_str()
+                except NotImplementedError:
+                    new_body = ""
+
+                new_content = f"---\n{yaml.dump(new_frontmatter)}---\n{new_body}"
+                with open(pointer_path, "w") as file:
+                    file.write(new_content)
+
+        elif "tag" in metadata:
+            tag_id = metadata["tag"]
+            tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
+            if tag:
+                new_content = f"---\ntitle: {tag['name']}\ntag: {tag_id}\n---\n{tag.get('description', '')}"
+                with open(pointer_path, "w") as file:
+                    file.write(new_content)
+
+    def sync_pointers(self, target_dir):
+        def read_pointers(target_dir):
+            pointers = {}
+            for root, _, files in os.walk(target_dir):
+                for file in files:
+                    if file.endswith(".md"):
+                        path = os.path.join(root, file)
+                        with open(path, "r") as f:
+                            content = f.read()
+                            try:
+                                frontmatter, _ = content.split("---", 2)[1:]
+                                metadata = yaml.safe_load(frontmatter)
+                                id_key = metadata.get("obj") or metadata.get("tag")
+                                if id_key:
+                                    pointers[id_key] = path
+                            except Exception as e:
+                                print(f"Error reading pointer {path}: {e}")
+            return pointers
+
+        def compare_state(library, pointers):
+            library_state = {}
+            for obj in library.media_objects:
+                library_state[obj.id] = "object"
+            for tag in library.tags:
+                library_state[tag["id"]] = "tag"
+
+            missing = {
+                id: typ for id, typ in library_state.items() if id not in pointers
+            }
+            outdated = {id: pointers[id] for id in pointers if id in library_state}
+            extra = {
+                id: path for id, path in pointers.items() if id not in library_state
+            }
+
+            return missing, outdated, extra
+
+        def update_target_dir(library, target_dir, missing, outdated, extra):
+            for id, typ in missing.items():
+                if typ == "object":
+                    obj = next(obj for obj in library.media_objects if obj.id == id)
+                    obj_dir = os.path.join(
+                        target_dir, f"media/{obj.__class__.__name__.lower()}"
+                    )
+                    library.create_pointer(obj, dest_path=obj_dir)
+                elif typ == "tag":
+                    library.create_pointer(id, dest_path=target_dir, mode="quartz")
+
+            for id, path in outdated.items():
+                library.update_pointer(path)
+
+            for id, path in extra.items():
+                os.remove(path)
+
+        pointers = read_pointers(target_dir)
+        missing, outdated, extra = compare_state(self, pointers)
+        update_target_dir(self, target_dir, missing, outdated, extra)
+
 
     def get_tag_name(self, tag_id):
         tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
