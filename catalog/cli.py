@@ -977,7 +977,9 @@ def tag_command(target, tag_str, library, remove):
 @click.command("tags")
 @click.argument(
     "action",
-    type=click.Choice(["create", "delete", "rename", "set-parent", "remove-parent"]),
+    type=click.Choice(
+        ["create", "delete", "rename", "set-desc", "set-parent", "remove-parent"]
+    ),
 )
 @click.argument("tag_str", required=False)
 @click.argument("param", required=False)
@@ -992,14 +994,13 @@ def tag_command(target, tag_str, library, remove):
     help="Parent tag name or ID to set or remove.",
 )
 def manage_tag_command(action, tag_str, param, library, parent):
-    """Manage tags: create, delete, rename, set-parent, or remove-parent."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
     try:
         if action == "create":
             parent_id = library.get_tag_id(parent) if parent else None
-            library.create_tag(tag_str, parent_id)
+            library.create_tag(tag_str, parent_id, description=param or "")
             library.save_library()
             click.echo(f"Tag '{tag_str}' created successfully.")
             return
@@ -1048,6 +1049,20 @@ def manage_tag_command(action, tag_str, param, library, parent):
             click.echo(
                 f"Parent tag '{parent or param}' removed from '{tag_str}' successfully."
             )
+            return
+
+        if action == "set-desc":
+            if os.path.isfile(param):
+                with open(param, "r") as file:
+                    description = file.read().strip()
+            else:
+                description = param.strip()
+
+            tag = next(tag for tag in library.tags if tag["id"] == tag_id)
+            tag["description"] = description
+
+            library.save_library()
+            click.echo(f"Description for tag '{tag_str}' updated successfully.")
             return
 
     except ValueError as e:
