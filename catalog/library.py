@@ -176,6 +176,10 @@ class Library:
                     for obj_data in library_data.get("media_objects", [])
                 ]
                 self.tags = library_data.get("tags", [])
+                self.groups = [
+                    self.deserialize_group(group_data)
+                    for group_data in library_data.get("groups", [])
+                ]
         else:
             print(
                 f"Library file not found at {self.library_path}. Starting with an empty library."
@@ -190,6 +194,9 @@ class Library:
             ],
             "tags": self.tags,
         }
+        library_data.update(
+            {"groups": [self.serialize_group(group) for group in self.groups]}
+        )
         with open(self.library_path, "w") as file:
             json.dump(library_data, file, indent=2)
 
@@ -637,7 +644,6 @@ class Library:
         missing, outdated, extra = compare_state(self, pointers)
         update_target_dir(self, target_dir, missing, outdated, extra)
 
-
     def get_tag_name(self, tag_id):
         tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
         if not tag:
@@ -907,3 +913,44 @@ class Library:
                 setattr(media_object, attr_name, attr_value)
 
         return media_object
+
+    def serialize_group(self, group):
+        return {
+            "id": group.id,
+            "name": group.name,
+            "created_by": group.created_by,
+            "date_created": group.date_created,
+            "objects": [obj.id for obj in group.objects],
+        }
+
+    def deserialize_group(self, group_data):
+        group = Group(
+            name=group_data["name"],
+            created_by=group_data["created_by"],
+        )
+        group.date_created = group_data["date_created"]
+        group.objects = self.fetch(group_data["objects"])
+        return group
+
+
+class Group:
+    def __init__(self, name="", created_by="user"):
+        self.id = str(uuid.uuid4())
+        self.name = name
+        self.created_by = created_by
+        self.date_created = datetime.now().isoformat()
+        self.objects = []
+
+    def add_objects(self, objects):
+        self.objects.extend(objects)
+        self.objects.sort(
+            key=lambda x: (
+                x.metadata.get("date_recorded"),
+                x.metadata.get("date_stored"),
+            )
+        )
+
+    def get_str(self, merged=False):
+        if merged:
+            return "\n".join([obj.get_markdown_str() for obj in self.objects])
+        return "\n".join([obj.metadata.get("name", obj.id) for obj in self.objects])
