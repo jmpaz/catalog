@@ -492,7 +492,6 @@ def add_command(path, library, datastore, media_class, no_copy):
 
 
 @click.command("ls")
-@click.argument("target", required=False)
 @click.argument("obj_target", required=False)
 @click.option(
     "--library",
@@ -1209,6 +1208,25 @@ def edit_command(locator, new_content):
         click.echo(f"Unexpected error: {str(e)}")
 
 
+@click.command("group")
+@click.argument("ids", nargs=-1)
+@click.option("--name", default="", help="Optional name for the group.")
+@click.option(
+    "--library", default="~/.config/catalog/library.json", help="Path to library file."
+)
+def group_command(ids, name, library):
+    """Create a group of specified media objects."""
+    library_path = os.path.expanduser(library)
+    library = Library(library_path)
+    objects = library.fetch(ids)
+    group = Group(name=name)
+    group.add_objects(objects)
+    library.groups.append(group)
+    library.save_library()
+    name_display = f'("{name}")' if name else "(no name)"
+    click.echo(f"Created group {group.id[:8]} {name_display}")
+
+
 cli.add_command(query_command)
 cli.add_command(transcribe_command)
 cli.add_command(add_command)
@@ -1221,3 +1239,4 @@ cli.add_command(tag_command)
 cli.add_command(manage_tag_command)
 cli.add_command(search_command)
 cli.add_command(edit_command)
+cli.add_command(group_command)
