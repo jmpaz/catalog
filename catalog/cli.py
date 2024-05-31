@@ -8,7 +8,7 @@ import yaml
 from datetime import datetime, timezone
 from rich.console import Console
 from rich.table import Table
-from catalog import Library
+from catalog import Library, Group
 from catalog.process import transcribe, process_transcript
 from catalog.embed import load_embeddings, reconcile_embeddings, vector_search
 from catalog.utils import fetch_subtarget_entry, get_available_subtargets
@@ -493,19 +493,22 @@ def add_command(path, library, datastore, media_class, no_copy):
 
 @click.command("ls")
 @click.argument("target", required=False)
+@click.argument("obj_target", required=False)
 @click.option(
     "--library",
     default="~/.config/catalog/library.json",
     help="Path to library file (default: ~/.config/catalog/library.json).",
 )
-@click.option("--tags", is_flag=True, help="List tags instead of objects.")
+@click.option("--tags", is_flag=True, help="List (only) tags.")
+@click.option("--groups", is_flag=True, help="List (only) groups.")
 @click.option("--page", is_flag=True, help="Display results in a pager.")
 @click.option(
     "--sort",
     type=str,
     help="Sort by specified fields (created, modified, stored, class, segments, transcripts, processed). Add :asc for ascending order (e.g., stored:asc). Multiple sorts can be comma-separated (e.g., class:asc,stored).",
 )
-def ls_command(target, library, page, tags, sort):
+def ls_command(obj_target, library, tags, groups, page, sort):
+    """List media objects in the library. Provide a target (eg 6e24a:speech_data) to list designated entries for a specific object; use --tags or --groups to list all objects of that type."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
@@ -520,8 +523,17 @@ def ls_command(target, library, page, tags, sort):
             console.print(table)
         return
 
-    if target:
-        parts = target.split(":")
+    if groups:
+        table = prepare_groups_table(library)
+        if page:
+            with console.pager():
+                console.print(table)
+        else:
+            console.print(table)
+        return
+
+    if obj_target:
+        parts = obj_target.split(":")
         media_id = parts[0]
         entry_type = parts[1] if len(parts) > 1 else None
 
@@ -712,6 +724,25 @@ def prepare_tags_table(library):
             str(tag_counts[tag["id"]]["entries"]),
         )
 
+    return table
+
+
+def prepare_groups_table(library):
+    table = Table(show_lines=True)
+    table.add_column("ID", no_wrap=True)
+    table.add_column("Name")
+    table.add_column("Created By")
+    table.add_column("Date Created", justify="right")
+    table.add_column("Object Count", justify="right")
+
+    for group in library.groups:
+        table.add_row(
+            group.id[:6],
+            group.name,
+            group.created_by,
+            group.date_created,
+            str(len(group.objects)),
+        )
     return table
 
 
