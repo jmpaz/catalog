@@ -925,6 +925,7 @@ class Library:
 
     def deserialize_group(self, group_data):
         group = Group(
+            id=group_data["id"],
             name=group_data["name"],
             created_by=group_data["created_by"],
         )
@@ -934,8 +935,8 @@ class Library:
 
 
 class Group:
-    def __init__(self, name="", created_by="user"):
-        self.id = str(uuid.uuid4())
+    def __init__(self, id=None, name="", created_by="user"):
+        self.id = id if id else str(uuid.uuid4())
         self.name = name
         self.created_by = created_by
         self.date_created = datetime.now().isoformat()
