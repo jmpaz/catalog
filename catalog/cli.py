@@ -15,17 +15,25 @@ from catalog.utils import fetch_subtarget_entry, get_available_subtargets
 from contextualize.tokenize import call_tiktoken
 
 
-def prepare_objects(library, query):
+def prepare_objects(library, query, type="media"):
     media_objects = []
-    for item in query:
-        if os.path.isfile(item):
-            try:
-                media_object = library.import_media_object(item, auto=True)
-                media_objects.append(media_object)
-            except ValueError as e:
-                click.echo(f"Error handling file {item}: {str(e)}")
-        else:
-            media_objects.extend(library.fetch(ids=[item]))
+    if type == "group":
+        for group_id in query:
+            group = library.fetch_group(group_id)
+            if group:
+                media_objects.extend(group.objects)
+            else:
+                click.echo(f"No group found with ID: {group_id}")
+    else:
+        for item in query:
+            if os.path.isfile(item):
+                try:
+                    media_object = library.import_media_object(item, auto=True)
+                    media_objects.append(media_object)
+                except ValueError as e:
+                    click.echo(f"Error handling file {item}: {str(e)}")
+            else:
+                media_objects.extend(library.fetch(ids=[item]))
     return media_objects
 
 
@@ -367,14 +375,10 @@ def transcribe_command(
     datastore_path = os.path.expanduser(datastore)
     library = Library(library_path, datastore_path)
 
-    if process_missing:
-        query = [
-            obj.id
-            for obj in library.media_objects
-            if obj.can_transcribe() and not obj.transcripts
-        ]
-
-    media_objects = prepare_objects(library, query)
+    query_type = "group" if query and query[0].startswith("group:") else "media"
+    if query_type == "group":
+        query = [q.split(":", 1)[1] for q in query]
+    media_objects = prepare_objects(library, query, type=query_type)
     click.echo(f"Media objects to transcribe: {len(media_objects)}")
 
     for media_object in media_objects:
@@ -885,7 +889,10 @@ def process_command(targets, library, transcript, config, process_missing):
         click.echo("Error: At least one target must be provided.")
         return
 
-    media_objects = prepare_objects(library, targets)
+    query_type = "group" if targets and targets[0].startswith("group:") else "media"
+    if query_type == "group":
+        targets = [t.split(":", 1)[1] for t in targets]
+    media_objects = prepare_objects(library, targets, type=query_type)
     print(f"Objects to process: {len(media_objects)}")
 
     if not config:
@@ -967,27 +974,40 @@ def tag_command(target, tag_str, library, remove):
     library = Library(library_path)
 
     try:
-        parts = target.split(":")
-        media_id = parts[0]
-        media_object = library.fetch([media_id])[0]
-
-        if len(parts) == 3:
-            entry_type, entry_id = parts[1], parts[2]
-            if entry_type not in ["transcripts", "speech_data"]:
-                click.echo(f"Error: Invalid entry type '{entry_type}'.")
+        if target.startswith("group:"):
+            group_id = target.split(":", 1)[1]
+            group = library.fetch_group(group_id)
+            if not group:
+                click.echo(f"No group found with ID: {group_id}")
                 return
-
             if remove:
-                tag_id = library.get_tag_id(tag_str)
-                library.untag_entry(media_object, entry_type, entry_id, tag_id)
+                library.untag_group(group, tag_str)
             else:
-                library.tag_entry(media_object, entry_type, entry_id, tag_str=tag_str)
+                library.tag_group(group, tag_str)
         else:
-            if remove:
-                tag_id = library.get_tag_id(tag_str)
-                library.untag_object(media_object, tag_id)
+            parts = target.split(":")
+            media_id = parts[0]
+            media_object = library.fetch([media_id])[0]
+
+            if len(parts) == 3:
+                entry_type, entry_id = parts[1], parts[2]
+                if entry_type not in ["transcripts", "speech_data"]:
+                    click.echo(f"Error: Invalid entry type '{entry_type}'.")
+                    return
+
+                if remove:
+                    tag_id = library.get_tag_id(tag_str)
+                    library.untag_entry(media_object, entry_type, entry_id, tag_id)
+                else:
+                    library.tag_entry(
+                        media_object, entry_type, entry_id, tag_str=tag_str
+                    )
             else:
-                library.tag_object(media_object, tag_str=tag_str)
+                if remove:
+                    tag_id = library.get_tag_id(tag_str)
+                    library.untag_object(media_object, tag_id)
+                else:
+                    library.tag_object(media_object, tag_str=tag_str)
 
         library.save_library()
         click.echo(f"Tag operation successful for {target}.")

@@ -373,6 +373,11 @@ class Library:
         else:
             raise ValueError(f"No media object found with ID: {media_object_id}")
 
+    def fetch_group(self, group_id):
+        return next(
+            (group for group in self.groups if group.id.startswith(group_id)), None
+        )
+
     def _print_value(self, value, indent=2):
         if isinstance(value, dict):
             for key, val in value.items():
@@ -798,6 +803,16 @@ class Library:
                 tag for tag in media_object.metadata["tags"] if tag["id"] != tag_id
             ]
 
+    def tag_group(self, group, tag_str):
+        tag_id = self.get_tag_id(tag_str)
+        if tag_id not in group.tags:
+            group.tags.append(tag_id)
+
+    def untag_group(self, group, tag_str):
+        tag_id = self.get_tag_id(tag_str)
+        if tag_id in group.tags:
+            group.tags.remove(tag_id)
+
     def untag_entry(self, media_object, entry_type, entry_id, tag_id):
         entry = fetch_subtarget_entry(media_object, entry_type, entry_id)
         if "tags" in entry:
@@ -921,6 +936,7 @@ class Library:
             "created_by": group.created_by,
             "date_created": group.date_created,
             "objects": [obj.id for obj in group.objects],
+            "tags": group.tags,
         }
 
     def deserialize_group(self, group_data):
@@ -931,6 +947,7 @@ class Library:
         )
         group.date_created = group_data["date_created"]
         group.objects = self.fetch(group_data["objects"])
+        group.tags = group_data.get("tags", [])
         return group
 
 
