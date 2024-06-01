@@ -85,93 +85,101 @@ def cli():
 def query_command(
     target, subtarget, library, output, output_file, list_properties, action, debug
 ):
-    """Query media objects."""
+    """Query media objects or groups."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
-    parts = target.split(":")
-    media_id = parts[0]
-    property = parts[1] if len(parts) > 1 else None
-    entry_id = parts[2] if len(parts) > 2 else None
-
-    subfield = None
-    subfield_range = None
-
-    if entry_id and "." in entry_id:
-        entry_parts = entry_id.split(".")
-        entry_id = entry_parts[0]
-        subfield = entry_parts[1]
-        if len(entry_parts) > 2:
-            subfield_range = entry_parts[2]
-
-    if subfield and subfield_range is None and ":" in target:
-        subfield_range = target.split(":")[-1]
-
-    media_objects = library.fetch([media_id])
-
-    if not media_objects:
-        click.echo(f"No media object found with ID: {media_id}")
-        return
-
-    media_object = media_objects[0]
-
-    if list_properties:
-        subtargets = get_available_subtargets(media_object)
-        click.echo(
-            f"Available properties for {media_object.id[:5]} ({media_object.__class__.__name__}):"
-        )
-        click.echo("\n".join(subtargets))
-        return
-
-    if property:
-        if entry_id:
-            if subfield in ["nodes", "sections"]:
-                entry = fetch_subtarget_entry(media_object, property, entry_id)
-                if not entry:
-                    click.echo(f"No entry found for {entry_id}")
-                    return
-
-                if debug:
-                    click.echo(
-                        f"Debug: Querying {subfield} with range {subfield_range}"
-                    )
-                    if subfield_range:
-                        if "-" in subfield_range:
-                            start, end = map(int, subfield_range.split("-"))
-                            indices = range(start, end + 1)
-                        else:
-                            indices = [int(subfield_range)]
-                    else:
-                        indices = range(len(entry[subfield]))
-
-                    click.echo(f"Indices to be fetched: {list(indices)}")
-                    return
-
-                result = format_subfield(entry, subfield, subfield_range)
-            else:
-                # Handle entry queries (media_id:entry_type:entry_id)
-                try:
-                    entry = fetch_subtarget_entry(media_object, property, entry_id)
-                    result = format_entry(entry, property, library)
-                except ValueError as e:
-                    click.echo(str(e))
-                    return
-        else:
-            # Property queries (including transcripts/speech_data)
-            entries = getattr(media_object, property, None)
-            if entries is None:
-                result = media_object.metadata.get(property)
-                if result is None:
-                    click.echo(
-                        f"Property or entry type '{property}' not found in media object."
-                    )
-                    return
-            elif property in ["transcripts", "speech_data"]:
-                result = format_entries(entries, property, library)
-            else:
-                result = entries
+    if target.startswith("group:"):
+        group_id = target.split(":", 1)[1]
+        try:
+            result = library.query_group(group_id)
+        except ValueError as e:
+            click.echo(str(e))
+            return
     else:
-        result = library.query(media_object)
+        parts = target.split(":")
+        media_id = parts[0]
+        property = parts[1] if len(parts) > 1 else None
+        entry_id = parts[2] if len(parts) > 2 else None
+
+        subfield = None
+        subfield_range = None
+
+        if entry_id and "." in entry_id:
+            entry_parts = entry_id.split(".")
+            entry_id = entry_parts[0]
+            subfield = entry_parts[1]
+            if len(entry_parts) > 2:
+                subfield_range = entry_parts[2]
+
+        if subfield and subfield_range is None and ":" in target:
+            subfield_range = target.split(":")[-1]
+
+        media_objects = library.fetch([media_id])
+
+        if not media_objects:
+            click.echo(f"No media object found with ID: {media_id}")
+            return
+
+        media_object = media_objects[0]
+
+        if list_properties:
+            subtargets = get_available_subtargets(media_object)
+            click.echo(
+                f"Available properties for {media_object.id[:5]} ({media_object.__class__.__name__}):"
+            )
+            click.echo("\n".join(subtargets))
+            return
+
+        if property:
+            if entry_id:
+                if subfield in ["nodes", "sections"]:
+                    entry = fetch_subtarget_entry(media_object, property, entry_id)
+                    if not entry:
+                        click.echo(f"No entry found for {entry_id}")
+                        return
+
+                    if debug:
+                        click.echo(
+                            f"Debug: Querying {subfield} with range {subfield_range}"
+                        )
+                        if subfield_range:
+                            if "-" in subfield_range:
+                                start, end = map(int, subfield_range.split("-"))
+                                indices = range(start, end + 1)
+                            else:
+                                indices = [int(subfield_range)]
+                        else:
+                            indices = range(len(entry[subfield]))
+
+                        click.echo(f"Indices to be fetched: {list(indices)}")
+                        return
+
+                    result = format_subfield(entry, subfield, subfield_range)
+                else:
+                    # Handle entry queries (media_id:entry_type:entry_id)
+                    try:
+                        entry = fetch_subtarget_entry(media_object, property, entry_id)
+                        result = format_entry(entry, property, library)
+                    except ValueError as e:
+                        click.echo(str(e))
+                        return
+            else:
+                # Property queries (including transcripts/speech_data)
+                entries = getattr(media_object, property, None)
+                if entries is None:
+                    result = media_object.metadata.get(property)
+                    if result is None:
+                        click.echo(
+                            f"Property or entry type '{property}' not found in media object."
+                        )
+                        return
+                elif property in ["transcripts", "speech_data"]:
+                    result = format_entries(entries, property, library)
+                else:
+                    result = entries
+        else:
+            result = library.query(media_object)
 
     if action:
         output = None  # do not output to console

@@ -378,6 +378,36 @@ class Library:
             (group for group in self.groups if group.id.startswith(group_id)), None
         )
 
+    def query_group(self, group_id):
+        group = self.fetch_group(group_id)
+        if not group:
+            raise ValueError(f"No group found with ID: {group_id}")
+
+        output = [
+            f"id: {group.id}",
+            f"name: {group.name}",
+            f"created_by: {group.created_by}",
+            f"date_created: {group.date_created}",
+        ]
+
+        if group.objects:
+            object_details = []
+            for obj in group.objects:
+                name = obj.metadata.get("name")
+                source_filename = obj.metadata.get("source_filename", "Unnamed")
+                if name:
+                    display_name = name[:20]
+                else:
+                    display_name = source_filename[:20]
+                object_details.append(f"{obj.id[:5]} ({display_name})")
+            output.append(f"objects: {', '.join(object_details)}")
+
+        if group.tags:
+            tags = [self.get_tag_name(tag_id) for tag_id in group.tags]
+            output.append(f"tags: {', '.join(tags)}")
+
+        return "\n".join(output)
+
     def _print_value(self, value, indent=2):
         if isinstance(value, dict):
             for key, val in value.items():
