@@ -82,8 +82,23 @@ def cli():
     is_flag=True,
     help="Print the section/node indices to be fetched instead of fetching them.",
 )
+@click.option(
+    "--context",
+    "-C",
+    type=int,
+    default=0,
+    help="Show the specified number of surrounding nodes or sections.",
+)
 def query_command(
-    target, subtarget, library, output, output_file, list_properties, action, debug
+    target,
+    subtarget,
+    library,
+    output,
+    output_file,
+    list_properties,
+    action,
+    debug,
+    context,
 ):
     """Query media objects or groups."""
     library_path = os.path.expanduser(library)
@@ -155,7 +170,7 @@ def query_command(
                         click.echo(f"Indices to be fetched: {list(indices)}")
                         return
 
-                    result = format_subfield(entry, subfield, subfield_range)
+                    result = format_subfield(entry, subfield, subfield_range, context)
                 else:
                     # Handle entry queries (media_id:entry_type:entry_id)
                     try:
@@ -280,8 +295,8 @@ def format_entry(entry, entry_type, library):
     return "\n".join(output).strip()
 
 
-def format_subfield(entry, subfield, subfield_range):
-    def format_nodes(entry, subfield_range):
+def format_subfield(entry, subfield, subfield_range, context=0):
+    def format_nodes(entry, subfield_range, context):
         nodes = entry["nodes"]
         selected_nodes = []
 
@@ -295,9 +310,18 @@ def format_subfield(entry, subfield, subfield_range):
         else:
             selected_nodes = nodes
 
+        if context:
+            start_index = max(
+                0, min(node["index"] for node in selected_nodes) - context
+            )
+            end_index = min(
+                len(nodes) - 1, max(node["index"] for node in selected_nodes) + context
+            )
+            selected_nodes = nodes[start_index : end_index + 1]
+
         return "\n".join(node["text"] for node in selected_nodes)
 
-    def format_sections(entry, subfield_range):
+    def format_sections(entry, subfield_range, context):
         sections = entry["sections"]
         selected_sections = []
 
@@ -311,6 +335,16 @@ def format_subfield(entry, subfield, subfield_range):
         else:
             selected_sections = sections
 
+        if context:
+            start_index = max(
+                0, min(section["index"] for section in selected_sections) - context
+            )
+            end_index = min(
+                len(sections) - 1,
+                max(section["index"] for section in selected_sections) + context,
+            )
+            selected_sections = sections[start_index : end_index + 1]
+
         result = ""
         for section in selected_sections:
             result += f"section {sections.index(section)}: \"{section['label']}\"\n"
@@ -319,9 +353,9 @@ def format_subfield(entry, subfield, subfield_range):
         return result
 
     if subfield == "nodes":
-        return format_nodes(entry, subfield_range)
+        return format_nodes(entry, subfield_range, context)
     elif subfield == "sections":
-        return format_sections(entry, subfield_range)
+        return format_sections(entry, subfield_range, context)
     else:
         return "Unsupported subfield type"
 
