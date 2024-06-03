@@ -193,10 +193,8 @@ class Library:
                 for media_object in self.media_objects
             ],
             "tags": self.tags,
+            "groups": [self.serialize_group(group) for group in self.groups],
         }
-        library_data.update(
-            {"groups": [self.serialize_group(group) for group in self.groups]}
-        )
         with open(self.library_path, "w") as file:
             json.dump(library_data, file, indent=2)
 
@@ -385,7 +383,7 @@ class Library:
 
         output = [
             f"id: {group.id}",
-            f"name: {group.name}",
+            f"name: {group.name if group.name else 'untitled'}",
             f"created_by: {group.created_by}",
             f"date_created: {group.date_created}",
         ]
@@ -401,6 +399,13 @@ class Library:
                     display_name = source_filename[:20]
                 object_details.append(f"{obj.id[:5]} ({display_name})")
             output.append(f"objects: {', '.join(object_details)}")
+
+        if group.groups:
+            subgroup_details = [
+                f"{subgroup.name if subgroup.name else 'untitled'} ({subgroup.id[:6]})"
+                for subgroup in group.groups
+            ]
+            output.append(f"subgroups: {', '.join(subgroup_details)}")
 
         if group.tags:
             tags = [self.get_tag_name(tag_id) for tag_id in group.tags]
@@ -967,6 +972,7 @@ class Library:
             "date_created": group.date_created,
             "objects": [obj.id for obj in group.objects],
             "tags": group.tags,
+            "groups": [self.serialize_group(subgroup) for subgroup in group.groups],
         }
 
     def deserialize_group(self, group_data):
@@ -978,6 +984,10 @@ class Library:
         group.date_created = group_data["date_created"]
         group.objects = self.fetch(group_data["objects"])
         group.tags = group_data.get("tags", [])
+        group.groups = [
+            self.deserialize_group(subgroup_data)
+            for subgroup_data in group_data.get("groups", [])
+        ]
         return group
 
 
@@ -988,6 +998,8 @@ class Group:
         self.created_by = created_by
         self.date_created = datetime.now().isoformat()
         self.objects = []
+        self.groups = []
+        self.tags = []
 
     def add_objects(self, objects):
         self.objects.extend(objects)
@@ -997,6 +1009,10 @@ class Group:
                 x.metadata.get("date_stored"),
             )
         )
+
+    def add_groups(self, groups):
+        self.groups.extend(groups)
+        self.groups.sort(key=lambda x: x.date_created)
 
     def get_str(self, merged=False):
         if merged:

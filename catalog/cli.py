@@ -776,17 +776,22 @@ def prepare_groups_table(library):
     table = Table(show_lines=True)
     table.add_column("ID", no_wrap=True)
     table.add_column("Name")
-    table.add_column("Created By")
+    table.add_column("Objects", justify="right")
+    table.add_column("Subgroups", justify="right")
+    table.add_column("Tags")
     table.add_column("Date Created", justify="right")
-    table.add_column("Object Count", justify="right")
 
     for group in library.groups:
+        name = group.name if group.name else "[untitled]"
+        tags = [library.get_tag_name(tag_id) for tag_id in group.tags]
+        tags_str = ", ".join(tags)
         table.add_row(
             group.id[:6],
-            group.name,
-            group.created_by,
-            group.date_created,
+            name,
             str(len(group.objects)),
+            str(len(group.groups)),
+            tags_str,
+            group.date_created,
         )
     return table
 
@@ -1276,13 +1281,26 @@ def edit_command(locator, new_content):
 @click.option(
     "--library", default="~/.config/catalog/library.json", help="Path to library file."
 )
-def group_command(ids, name, library):
+@click.option(
+    "--nested-groups",
+    "-g",
+    default="",
+    help="Comma-separated list of group IDs to include as subgroups.",
+)
+def group_command(ids, name, library, subgroups):
     """Create a group of specified media objects."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
     objects = library.fetch(ids)
     group = Group(name=name)
     group.add_objects(objects)
+
+    if subgroups:
+        subgroup_ids = subgroups.split(",")
+        subgroups = [library.fetch_group(group_id) for group_id in subgroup_ids]
+        subgroups = [group for group in subgroups if group is not None]
+        group.add_groups(subgroups)
+
     library.groups.append(group)
     library.save_library()
     name_display = f'("{name}")' if name else "(no name)"
