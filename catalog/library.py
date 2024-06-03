@@ -386,6 +386,7 @@ class Library:
             f"name: {group.name if group.name else 'untitled'}",
             f"created_by: {group.created_by}",
             f"date_created: {group.date_created}",
+            f"description: {group.description[:40]}",
         ]
 
         if group.objects:
@@ -973,6 +974,7 @@ class Library:
             "objects": [obj.id for obj in group.objects],
             "tags": group.tags,
             "groups": [self.serialize_group(subgroup) for subgroup in group.groups],
+            "description": group.description,
         }
 
     def deserialize_group(self, group_data):
@@ -980,6 +982,7 @@ class Library:
             id=group_data["id"],
             name=group_data["name"],
             created_by=group_data["created_by"],
+            description=group_data.get("description", ""),
         )
         group.date_created = group_data["date_created"]
         group.objects = self.fetch(group_data["objects"])
@@ -992,7 +995,7 @@ class Library:
 
 
 class Group:
-    def __init__(self, id=None, name="", created_by="user"):
+    def __init__(self, id=None, name="", created_by="user", description=""):
         self.id = id if id else str(uuid.uuid4())
         self.name = name
         self.created_by = created_by
@@ -1000,6 +1003,7 @@ class Group:
         self.objects = []
         self.groups = []
         self.tags = []
+        self.description = description
 
     def add_objects(self, objects):
         self.objects.extend(objects)
