@@ -1003,8 +1003,9 @@ def export_command(target, format, library):
 
 
 @click.command("tag")
-@click.argument("target")
-@click.argument("tag_str")
+@click.argument("target", required=False)
+@click.argument("tag_str", required=False)
+@click.option("--create", "-c", is_flag=True, help="Create a new tag.")
 @click.option(
     "--library",
     default="~/.config/catalog/library.json",
@@ -1015,64 +1016,76 @@ def export_command(target, format, library):
     is_flag=True,
     help="Remove the specified tag instead of assigning it.",
 )
-def tag_command(target, tag_str, library, remove):
-    """Assign or remove a tag to a media object or entry."""
+def tag_command(target, tag_str, create, library, remove):
+    """Assign, remove, or create tags for a media object or entry."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
-    try:
-        if target.startswith("group:"):
-            group_id = target.split(":", 1)[1]
-            group = library.fetch_group(group_id)
-            if not group:
-                click.echo(f"No group found with ID: {group_id}")
-                return
-            if remove:
-                library.untag_group(group, tag_str)
-            else:
-                library.tag_group(group, tag_str)
-        else:
-            parts = target.split(":")
-            media_id = parts[0]
-            media_object = library.fetch([media_id])[0]
-
-            if len(parts) == 3:
-                entry_type, entry_id = parts[1], parts[2]
-                if entry_type not in ["transcripts", "speech_data"]:
-                    click.echo(f"Error: Invalid entry type '{entry_type}'.")
-                    return
-
-                if remove:
-                    tag_id = library.get_tag_id(tag_str)
-                    library.untag_entry(media_object, entry_type, entry_id, tag_id)
-                else:
-                    library.tag_entry(
-                        media_object, entry_type, entry_id, tag_str=tag_str
-                    )
-            else:
-                if remove:
-                    tag_id = library.get_tag_id(tag_str)
-                    library.untag_object(media_object, tag_id)
-                else:
-                    library.tag_object(media_object, tag_str=tag_str)
-
+    if create:
+        if not tag_str:
+            click.echo("Error: Tag name is required to create a tag.")
+            return
+        parent_id = library.get_tag_id(target) if target else None
+        library.create_tag(tag_str, parent_id, description="")
         library.save_library()
-        click.echo(f"Tag operation successful for {target}.")
+        click.echo(f"Tag '{tag_str}' created successfully.")
+    else:
+        if not tag_str or not target:
+            click.echo(
+                "Error: Both tag name and target are required when not creating a new tag."
+            )
+            return
+        try:
+            if target.startswith("group:"):
+                group_id = target.split(":", 1)[1]
+                group = library.fetch_group(group_id)
+                if not group:
+                    click.echo(f"No group found with ID: {group_id}")
+                    return
+                if remove:
+                    library.untag_group(group, tag_str)
+                else:
+                    library.tag_group(group, tag_str)
+            else:
+                parts = target.split(":")
+                media_id = parts[0]
+                media_object = library.fetch([media_id])[0]
 
-    except ValueError as e:
-        click.echo(f"Error: {str(e)}")
-    except Exception as e:
-        click.echo(f"Unexpected error: {str(e)}")
+                if len(parts) == 3:
+                    entry_type, entry_id = parts[1], parts[2]
+                    if entry_type not in ["transcripts", "speech_data"]:
+                        click.echo(f"Error: Invalid entry type '{entry_type}'.")
+                        return
+
+                    if remove:
+                        tag_id = library.get_tag_id(tag_str)
+                        library.untag_entry(media_object, entry_type, entry_id, tag_id)
+                    else:
+                        library.tag_entry(
+                            media_object, entry_type, entry_id, tag_str=tag_str
+                        )
+                else:
+                    if remove:
+                        tag_id = library.get_tag_id(tag_str)
+                        library.untag_object(media_object, tag_id)
+                    else:
+                        library.tag_object(media_object, tag_str=tag_str)
+
+            library.save_library()
+            click.echo(f"Tag operation successful for {target}.")
+
+        except ValueError as e:
+            click.echo(f"Error: {str(e)}")
+        except Exception as e:
+            click.echo(f"Unexpected error: {str(e)}")
 
 
-@click.command("tags")
+@click.command("manage")
+@click.argument("target", type=str)
 @click.argument(
     "action",
-    type=click.Choice(
-        ["create", "delete", "rename", "set-desc", "set-parent", "remove-parent"]
-    ),
+    type=click.Choice(["rename", "set-desc", "set-parent", "remove-parent", "rm"]),
 )
-@click.argument("tag_str", required=False)
 @click.argument("param", required=False)
 @click.option(
     "--library",
@@ -1082,32 +1095,25 @@ def tag_command(target, tag_str, library, remove):
 @click.option(
     "--parent",
     "-p",
-    help="Parent tag name or ID to set or remove.",
+    help="Parent tag or group name or ID to set or remove.",
 )
-def manage_tag_command(action, tag_str, param, library, parent):
+def manage_command(target, action, param, library, parent):
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
+    if target.startswith("tag:"):
+        tag_str = target.split(":", 1)[1]
+        manage_tag(action, tag_str, param, library, parent)
+    elif target.startswith("group:"):
+        group_str = target.split(":", 1)[1]
+        manage_group(action, group_str, param, library, parent)
+    else:
+        click.echo("Error: Target must start with 'tag:' or 'group:'")
+
+
+def manage_tag(action, tag_str, param, library, parent):
     try:
-        if action == "create":
-            parent_id = library.get_tag_id(parent) if parent else None
-            library.create_tag(tag_str, parent_id, description=param or "")
-            library.save_library()
-            click.echo(f"Tag '{tag_str}' created successfully.")
-            return
-
         tag_id = library.get_tag_id(tag_str)
-
-        if action == "delete":
-            assignments_count = library.count_tag_assignments(tag_id)
-            if not click.confirm(
-                f"Tag '{tag_str}' is assigned to {assignments_count} items. Do you want to delete it?"
-            ):
-                return
-            library.delete_tag(tag_id)
-            library.save_library()
-            click.echo(f"Tag '{tag_str}' deleted successfully.")
-            return
 
         if action == "rename":
             if not param:
@@ -1154,6 +1160,103 @@ def manage_tag_command(action, tag_str, param, library, parent):
 
             library.save_library()
             click.echo(f"Description for tag '{tag_str}' updated successfully.")
+            return
+
+        if action == "rm":
+            assignments_count = library.count_tag_assignments(tag_id)
+            if not click.confirm(
+                f"Tag '{tag_str}' is assigned to {assignments_count} items. Do you want to delete it?"
+            ):
+                return
+            library.delete_tag(tag_id)
+            library.save_library()
+            click.echo(f"Tag '{tag_str}' deleted successfully.")
+            return
+
+    except ValueError as e:
+        click.echo(f"Error: {str(e)}")
+    except Exception as e:
+        click.echo(f"Unexpected error: {str(e)}")
+
+
+def manage_group(action, group_str, param, library, parent):
+    try:
+        group = library.fetch_group(group_str)
+        if not group:
+            click.echo(f"No group found with ID: {group_str}")
+            return
+
+        group_name = group.name or group_str
+
+        if action == "rename":
+            if not param:
+                click.echo("Error: New name is required to rename a group.")
+                return
+            group.name = param
+            library.save_library()
+            click.echo(f"Group '{group_name}' renamed to '{param}' successfully.")
+            return
+
+        if action == "set-parent":
+            parent_group = library.fetch_group(parent or param)
+            if not parent_group:
+                click.echo(
+                    "Error: Valid parent group is required to set a parent group."
+                )
+                return
+            if parent_group.id == group.id:
+                click.echo("Error: A group cannot be its own parent.")
+                return
+            if group in parent_group.groups:
+                click.echo(
+                    "Error: This group is already a subgroup of the parent group."
+                )
+                return
+            parent_group.add_groups([group])
+            library.save_library()
+            click.echo(
+                f"Parent group '{parent_group.name or parent_group.id[:6]}' added to '{group_name}' successfully."
+            )
+            return
+
+        if action == "remove-parent":
+            parent_group = library.fetch_group(parent or param)
+            if not parent_group:
+                click.echo(
+                    "Error: Valid parent group is required to remove a parent group."
+                )
+                return
+            if group.id not in [subgroup.id for subgroup in parent_group.groups]:
+                click.echo("Error: This group is not a subgroup of the parent group.")
+                return
+            parent_group.groups = [
+                subgroup for subgroup in parent_group.groups if subgroup.id != group.id
+            ]
+            library.save_library()
+            click.echo(
+                f"Parent group '{parent_group.name or parent_group.id[:6]}' removed from '{group_name}' successfully."
+            )
+            return
+
+        if action == "set-desc":
+            if os.path.isfile(param):
+                with open(param, "r") as file:
+                    description = file.read().strip()
+            else:
+                description = param.strip()
+            group.description = description
+            library.save_library()
+            click.echo(f"Description for group '{group_name}' updated successfully.")
+            return
+
+        if action == "rm":
+            if not click.confirm(
+                f"Are you sure you want to delete the group '{group_name}'?"
+            ):
+                return
+            library.groups.remove(group)
+            library.save_library()
+            click.echo(f"Group '{group_name}' deleted successfully.")
             return
 
     except ValueError as e:
@@ -1276,8 +1379,15 @@ def edit_command(locator, new_content):
 
 
 @click.command("group")
+@click.argument("name", required=False)
 @click.argument("ids", nargs=-1)
-@click.option("--name", default="", help="Optional name for the group.")
+@click.option("--create", "-c", is_flag=True, help="Create a new group.")
+@click.option(
+    "--description",
+    "-d",
+    default="",
+    help="Optional description (used with --create).",
+)
 @click.option(
     "--library", default="~/.config/catalog/library.json", help="Path to library file."
 )
@@ -1287,24 +1397,43 @@ def edit_command(locator, new_content):
     default="",
     help="Comma-separated list of group IDs to include as subgroups.",
 )
-def group_command(ids, name, library, subgroups):
-    """Create a group of specified media objects."""
+def group_command(name, ids, create, description, library, nested_groups):
+    """Create or manage groups of specified media objects."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
-    objects = library.fetch(ids)
-    group = Group(name=name)
-    group.add_objects(objects)
 
-    if subgroups:
-        subgroup_ids = subgroups.split(",")
-        subgroups = [library.fetch_group(group_id) for group_id in subgroup_ids]
-        subgroups = [group for group in subgroups if group is not None]
-        group.add_groups(subgroups)
+    if create:
+        if not name:
+            click.echo("Error: Group name is required to create a group.")
+            return
+        existing_group = next(
+            (group for group in library.groups if group.name == name), None
+        )
+        if existing_group:
+            click.echo(f"Group '{name}' already exists with ID: {existing_group.id}")
+            return
+        group = Group(name=name, description=description)
+        library.groups.append(group)
+        library.save_library()
+        click.echo(f"Group '{group.id[:6]}' created successfully.")
+    else:
+        if not name:
+            click.echo("Error: Group name is required when not creating a new group.")
+            return
+        objects = library.fetch(ids)
+        group = Group(name=name)
+        group.add_objects(objects)
 
-    library.groups.append(group)
-    library.save_library()
-    name_display = f'("{name}")' if name else "(no name)"
-    click.echo(f"Created group {group.id[:8]} {name_display}")
+        if nested_groups:
+            subgroup_ids = nested_groups.split(",")
+            subgroups = [library.fetch_group(group_id) for group_id in subgroup_ids]
+            subgroups = [group for group in subgroups if group is not None]
+            group.add_groups(subgroups)
+
+        library.groups.append(group)
+        library.save_library()
+        name_display = f'("{name}")' if name else "(no name)"
+        click.echo(f"Created group {group.id[:8]} {name_display}")
 
 
 cli.add_command(query_command)
@@ -1316,7 +1445,7 @@ cli.add_command(markdown_pointers_command)
 cli.add_command(process_command)
 cli.add_command(export_command)
 cli.add_command(tag_command)
-cli.add_command(manage_tag_command)
+cli.add_command(manage_command)
 cli.add_command(search_command)
 cli.add_command(edit_command)
 cli.add_command(group_command)
