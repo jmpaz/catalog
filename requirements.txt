@@ -7,3 +7,4 @@ fuzzywuzzy>=0.18.0
 python_Levenshtein
 pyperclip>=1.8.2
 send2trash>=1.8.3
+nomic==3.0.29
