@@ -1170,7 +1170,7 @@ def manage_tag(action, tag_str, param, library, parent):
                 return
             library.delete_tag(tag_id)
             library.save_library()
-            click.echo(f"Tag {tag_label} deleted.")
+            click.echo("Tag deleted.")
             return
 
     except ValueError as e:

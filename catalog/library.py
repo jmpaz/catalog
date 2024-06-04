@@ -751,6 +751,8 @@ class Library:
 
     def delete_tag(self, tag_id):
         self.tags = [tag for tag in self.tags if tag["id"] != tag_id]
+
+        # unassign from objects
         for obj in self.media_objects:
             if "tags" in obj.metadata:
                 obj.metadata["tags"] = [
@@ -762,6 +764,12 @@ class Library:
                         entry["tags"] = [
                             tag for tag in entry["tags"] if tag["id"] != tag_id
                         ]
+
+        # unassign from groups
+        for group in self.groups:
+            if tag_id in group.tags:
+                print(f"Unassigning from group {group.id[:6]}")
+                group.tags.remove(tag_id)
 
     def rename_tag(self, tag_id, new_name):
         tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
