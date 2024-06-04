@@ -6,23 +6,30 @@ import re
 
 def transcribe(
     audio_obj,
-    device="cuda",
+    device=None,
     device_index=0,
     batch_size=16,
-    compute_type="float16",
     vad_sensitivity=0.1,
     diarize=False,
     speaker_count=1,
     whisper_version="large-v2",
     initial_prompt=None,
 ):
+    import torch
     import whisperx
     from catalog.utils import clear_memory
 
     if not hasattr(audio_obj, "can_transcribe"):
         raise ValueError("This media object cannot be transcribed")
 
-    print("Preparing to transcribe")
+    if device is None:
+        if torch.cuda.is_available():
+            device = "cuda"
+            compute_type = "float16"
+        else:
+            device = "cpu"
+            compute_type = "float32"
+
     model = whisperx.load_model(
         whisper_version,
         device=device,
@@ -71,7 +78,7 @@ def transcribe(
             "diarize": diarize,
             "speaker_count": speaker_count,
             "vad_sensitivity": vad_sensitivity,
-        },  # Store the relevant transcribe() parameters
+        },
         "nodes": [
             {
                 "start": segment["start"],
