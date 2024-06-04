@@ -1378,14 +1378,13 @@ def edit_command(locator, new_content):
 
 
 @click.command("group")
-@click.argument("name", required=False)
 @click.argument("ids", nargs=-1)
-@click.option("--create", "-c", is_flag=True, help="Create a new group.")
+@click.argument("name", required=True)
 @click.option(
     "--description",
     "-d",
     default="",
-    help="Optional description (used with --create).",
+    help="Optional description (for use when creating a new group).",
 )
 @click.option(
     "--library", default="~/.config/catalog/library.json", help="Path to library file."
@@ -1394,50 +1393,42 @@ def edit_command(locator, new_content):
     "--nested-groups",
     "-g",
     default="",
-    help="Comma-separated list of group IDs to include as subgroups.",
+    help="Comma-separated list of group IDs to include as subgroups (when creating a new group).",
 )
-def group_command(name, ids, create, description, library, nested_groups):
-    """Create groups with specified media objects. Usage: 'group [name] [ids] [options]'."""
+def group_command(ids, name, description, library, nested_groups):
+    """Create or update a group with specified media objects. Usage: 'group [ids] [name] [options]'."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
-    if create:
-        if not name:
-            click.echo("Error: Group name is required to create a group.")
-            return
-        existing_group = next(
-            (group for group in library.groups if group.name == name), None
-        )
-        if existing_group:
-            click.echo(f"Group '{name}' already exists with ID: {existing_group.id}")
-            return
-        group = Group(name=name, description=description)
-        library.groups.append(group)
-        library.save_library()
-        click.echo(f"Group '{group.id[:6]}' created.")
-    else:
-        if not name:
-            click.echo("Error: Group name is required when not creating a new group.")
-            return
+    try:
+        group = library.fetch_group(name)
+        click.echo(f"Group '{name}' exists with ID: {group.id}. Updating...")
+    except ValueError:
         if not ids:
-            click.echo(
-                "Error: At least one media object ID is required when not creating a new group."
-            )
-            return
+            if click.confirm(f"Group '{name}' does not exist. Create a new group?"):
+                group = Group(name=name, description=description)
+                library.groups.append(group)
+                click.echo(f"Created new group '{name}'.")
+            else:
+                return
+        else:
+            group = Group(name=name, description=description)
+            library.groups.append(group)
+            click.echo(f"Created new group '{name}'.")
+
+    if ids:
+        print(f"Adding objects: {ids}")
         objects = library.fetch(ids)
-        group = Group(name=name)
         group.add_objects(objects)
 
-        if nested_groups:
-            subgroup_ids = nested_groups.split(",")
-            subgroups = [library.fetch_group(group_id) for group_id in subgroup_ids]
-            subgroups = [group for group in subgroups if group is not None]
-            group.add_groups(subgroups)
+    if nested_groups:
+        print(f"Adding subgroups: {nested_groups}")
+        subgroup_ids = nested_groups.split(",")
+        subgroups = [library.fetch_group(group_id) for group_id in subgroup_ids]
+        subgroups = [group for group in subgroups if group is not None]
+        group.add_groups(subgroups)
 
-        library.groups.append(group)
-        library.save_library()
-        name_display = f'("{name}")' if name else "(no name)"
-        click.echo(f"Created group {group.id[:8]} {name_display}")
+    library.save_library()
 
 
 cli.add_command(query_command)
