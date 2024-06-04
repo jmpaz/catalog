@@ -1115,6 +1115,8 @@ def manage_command(target, action, param, library, parent):
 def manage_tag(action, tag_str, param, library, parent):
     try:
         tag_id = library.get_tag_id(tag_str)
+        tag = next(tag for tag in library.tags if tag["id"] == tag_id)
+        tag_label = f"'{tag['name']}' ({tag_id[:6]})"
 
         if action == "rename":
             if not param:
@@ -1122,7 +1124,7 @@ def manage_tag(action, tag_str, param, library, parent):
                 return
             library.rename_tag(tag_id, param)
             library.save_library()
-            click.echo(f"Tag '{tag_str}' renamed to '{param}'.")
+            click.echo(f"Tag {tag_label} renamed to '{param}'.")
             return
 
         if action == "set-parent":
@@ -1132,7 +1134,7 @@ def manage_tag(action, tag_str, param, library, parent):
                 return
             library.add_parent_tag(tag_id, parent_id)
             library.save_library()
-            click.echo(f"Parent tag '{parent or param}' added to '{tag_str}'.")
+            click.echo(f"Parent tag '{parent or param}' added to {tag_label}.")
             return
 
         if action == "remove-parent":
@@ -1142,7 +1144,7 @@ def manage_tag(action, tag_str, param, library, parent):
                 return
             library.remove_parent_tag(tag_id, parent_id)
             library.save_library()
-            click.echo(f"Parent tag '{parent or param}' removed from '{tag_str}'.")
+            click.echo(f"Parent tag '{parent or param}' removed from {tag_label}.")
             return
 
         if action == "set-desc":
@@ -1156,18 +1158,18 @@ def manage_tag(action, tag_str, param, library, parent):
             tag["description"] = description
 
             library.save_library()
-            click.echo(f"Description for tag '{tag_str}' updated.")
+            click.echo(f"Description for tag {tag_label} updated.")
             return
 
         if action == "rm":
             assignments_count = library.count_tag_assignments(tag_id)
             if not click.confirm(
-                f"Tag '{tag_str}' is assigned to {assignments_count} items. Do you want to delete it?"
+                f"Tag {tag_label} is assigned to {assignments_count} items. Do you want to delete it?"
             ):
                 return
             library.delete_tag(tag_id)
             library.save_library()
-            click.echo(f"Tag '{tag_str}' deleted.")
+            click.echo(f"Tag {tag_label} deleted.")
             return
 
     except ValueError as e:

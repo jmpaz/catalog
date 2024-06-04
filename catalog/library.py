@@ -371,10 +371,33 @@ class Library:
         else:
             raise ValueError(f"No media object found with ID: {media_object_id}")
 
-    def fetch_group(self, group_id):
-        return next(
-            (group for group in self.groups if group.id.startswith(group_id)), None
+    def fetch_group(self, group_identifier):
+        # check if identifier is an ID
+        group = next(
+            (group for group in self.groups if group.id.startswith(group_identifier)),
+            None,
         )
+        if group:
+            return group
+
+        # check if identifier is a name
+        potential_matches = [
+            group
+            for group in self.groups
+            if group.name and group.name.lower() == group_identifier.lower()
+        ]
+
+        if len(potential_matches) == 1:
+            return potential_matches[0]
+        elif len(potential_matches) > 1:
+            conflict_details = "\n".join(
+                [f"{match.name} (ID: {match.id})" for match in potential_matches]
+            )
+            raise ValueError(
+                f"Multiple matches found for group '{group_identifier}':\n{conflict_details}"
+            )
+        else:
+            raise ValueError(f"No group found with identifier: {group_identifier}")
 
     def query_group(self, group_id):
         group = self.fetch_group(group_id)
@@ -797,31 +820,15 @@ class Library:
                 )
 
         # find potential matches by name/parentage
-        target_parts = target.split("/")
-        potential_matches = []
-
-        for tag in self.tags:
-            tag_parts = [tag["name"]]
-            parent_ids = tag.get("parents", [])
-
-            while parent_ids:
-                parent_id = parent_ids[0]
-                parent_tag = next((t for t in self.tags if t["id"] == parent_id), None)
-                if parent_tag:
-                    tag_parts.insert(0, parent_tag["name"])
-                    parent_ids = parent_tag.get("parents", [])
-                else:
-                    break
-
-            # check if the base name matches
-            if target_parts[-1].lower() == tag_parts[-1].lower():
-                potential_matches.append((tag["id"], "/".join(tag_parts)))
+        potential_matches = [
+            tag for tag in self.tags if tag["name"].lower() == target.lower()
+        ]
 
         if len(potential_matches) == 1:
-            return potential_matches[0][0]
+            return potential_matches[0]["id"]
         elif len(potential_matches) > 1:
             conflict_details = "\n".join(
-                [f"{match[1]} (ID: {match[0]})" for match in potential_matches]
+                [f"{match['name']} (ID: {match['id']})" for match in potential_matches]
             )
             raise ValueError(
                 f"Multiple matches found for tag '{target}':\n{conflict_details}"
