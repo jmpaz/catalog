@@ -1028,7 +1028,7 @@ def tag_command(target, tag_str, create, library, remove):
         parent_id = library.get_tag_id(target) if target else None
         library.create_tag(tag_str, parent_id, description="")
         library.save_library()
-        click.echo(f"Tag '{tag_str}' created successfully.")
+        click.echo(f"Tag '{tag_str}' created.")
     else:
         if not tag_str or not target:
             click.echo(
@@ -1098,6 +1098,7 @@ def tag_command(target, tag_str, create, library, remove):
     help="Parent tag or group name or ID to set or remove.",
 )
 def manage_command(target, action, param, library, parent):
+    """Manage tags and groups of specified media objects. Usage: 'manage [tag|group]:[id|name] [action] [param]'."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
@@ -1121,7 +1122,7 @@ def manage_tag(action, tag_str, param, library, parent):
                 return
             library.rename_tag(tag_id, param)
             library.save_library()
-            click.echo(f"Tag '{tag_str}' renamed to '{param}' successfully.")
+            click.echo(f"Tag '{tag_str}' renamed to '{param}'.")
             return
 
         if action == "set-parent":
@@ -1131,9 +1132,7 @@ def manage_tag(action, tag_str, param, library, parent):
                 return
             library.add_parent_tag(tag_id, parent_id)
             library.save_library()
-            click.echo(
-                f"Parent tag '{parent or param}' added to '{tag_str}' successfully."
-            )
+            click.echo(f"Parent tag '{parent or param}' added to '{tag_str}'.")
             return
 
         if action == "remove-parent":
@@ -1143,9 +1142,7 @@ def manage_tag(action, tag_str, param, library, parent):
                 return
             library.remove_parent_tag(tag_id, parent_id)
             library.save_library()
-            click.echo(
-                f"Parent tag '{parent or param}' removed from '{tag_str}' successfully."
-            )
+            click.echo(f"Parent tag '{parent or param}' removed from '{tag_str}'.")
             return
 
         if action == "set-desc":
@@ -1159,7 +1156,7 @@ def manage_tag(action, tag_str, param, library, parent):
             tag["description"] = description
 
             library.save_library()
-            click.echo(f"Description for tag '{tag_str}' updated successfully.")
+            click.echo(f"Description for tag '{tag_str}' updated.")
             return
 
         if action == "rm":
@@ -1170,7 +1167,7 @@ def manage_tag(action, tag_str, param, library, parent):
                 return
             library.delete_tag(tag_id)
             library.save_library()
-            click.echo(f"Tag '{tag_str}' deleted successfully.")
+            click.echo(f"Tag '{tag_str}' deleted.")
             return
 
     except ValueError as e:
@@ -1194,7 +1191,7 @@ def manage_group(action, group_str, param, library, parent):
                 return
             group.name = param
             library.save_library()
-            click.echo(f"Group '{group_name}' renamed to '{param}' successfully.")
+            click.echo(f"Group '{group_name}' renamed to '{param}'.")
             return
 
         if action == "set-parent":
@@ -1215,7 +1212,7 @@ def manage_group(action, group_str, param, library, parent):
             parent_group.add_groups([group])
             library.save_library()
             click.echo(
-                f"Parent group '{parent_group.name or parent_group.id[:6]}' added to '{group_name}' successfully."
+                f"Parent group '{parent_group.name or parent_group.id[:6]}' added to '{group_name}'."
             )
             return
 
@@ -1234,7 +1231,7 @@ def manage_group(action, group_str, param, library, parent):
             ]
             library.save_library()
             click.echo(
-                f"Parent group '{parent_group.name or parent_group.id[:6]}' removed from '{group_name}' successfully."
+                f"Parent group '{parent_group.name or parent_group.id[:6]}' removed from '{group_name}'."
             )
             return
 
@@ -1246,7 +1243,7 @@ def manage_group(action, group_str, param, library, parent):
                 description = param.strip()
             group.description = description
             library.save_library()
-            click.echo(f"Description for group '{group_name}' updated successfully.")
+            click.echo(f"Description for group '{group_name}' updated.")
             return
 
         if action == "rm":
@@ -1254,8 +1251,8 @@ def manage_group(action, group_str, param, library, parent):
                 f"Are you sure you want to delete the group '{group_name}'?"
             ):
                 return
-            click.echo(f"Group '{group_name}' deleted successfully.")
             library.delete_group(group.id)
+            click.echo(f"Group '{group_name}' deleted.")
             return
 
     except ValueError as e:
@@ -1370,7 +1367,7 @@ def edit_command(locator, new_content):
 
     try:
         update_node_content(locator, new_content)
-        click.echo("Node content updated successfully.")
+        click.echo("Node content updated.")
     except ValueError as e:
         click.echo(f"Error: {str(e)}")
     except Exception as e:
@@ -1397,7 +1394,7 @@ def edit_command(locator, new_content):
     help="Comma-separated list of group IDs to include as subgroups.",
 )
 def group_command(name, ids, create, description, library, nested_groups):
-    """Create or manage groups of specified media objects."""
+    """Create groups with specified media objects. Usage: 'group [name] [ids] [options]'."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
@@ -1414,10 +1411,15 @@ def group_command(name, ids, create, description, library, nested_groups):
         group = Group(name=name, description=description)
         library.groups.append(group)
         library.save_library()
-        click.echo(f"Group '{group.id[:6]}' created successfully.")
+        click.echo(f"Group '{group.id[:6]}' created.")
     else:
         if not name:
             click.echo("Error: Group name is required when not creating a new group.")
+            return
+        if not ids:
+            click.echo(
+                "Error: At least one media object ID is required when not creating a new group."
+            )
             return
         objects = library.fetch(ids)
         group = Group(name=name)
