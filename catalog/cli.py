@@ -1254,9 +1254,8 @@ def manage_group(action, group_str, param, library, parent):
                 f"Are you sure you want to delete the group '{group_name}'?"
             ):
                 return
-            library.groups.remove(group)
-            library.save_library()
             click.echo(f"Group '{group_name}' deleted successfully.")
+            library.delete_group(group.id)
             return
 
     except ValueError as e:

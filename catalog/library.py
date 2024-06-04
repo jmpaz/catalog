@@ -414,6 +414,20 @@ class Library:
 
         return "\n".join(output)
 
+    def delete_group(self, group_id):
+        group = self.fetch_group(group_id)
+        if not group:
+            raise ValueError(f"No group found with ID: {group_id}")
+
+        # unassign as parent of any subgroups
+        for subgroup in self.groups:
+            if group in subgroup.groups:
+                subgroup.groups.remove(group)
+
+        # remove group from library
+        self.groups = [g for g in self.groups if g.id != group_id]
+        self.save_library()
+
     def _print_value(self, value, indent=2):
         if isinstance(value, dict):
             for key, val in value.items():
