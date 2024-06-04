@@ -1022,13 +1022,14 @@ def tag_command(target, tag_str, create, library, remove):
     library = Library(library_path)
 
     if create:
-        if not tag_str:
+        if not target:
             click.echo("Error: Tag name is required to create a tag.")
             return
-        parent_id = library.get_tag_id(target) if target else None
-        library.create_tag(tag_str, parent_id, description="")
+        tag_name = target
+        parent_id = library.get_tag_id(tag_str) if tag_str else None
+        library.create_tag(tag_name, parent_id, description="")
         library.save_library()
-        click.echo(f"Tag '{tag_str}' created.")
+        click.echo(f"Tag '{tag_name}' created.")
     else:
         if not tag_str or not target:
             click.echo(
