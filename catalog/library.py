@@ -1035,13 +1035,17 @@ class Group:
         self.description = description
 
     def add_objects(self, objects):
-        self.objects.extend(objects)
-        self.objects.sort(
-            key=lambda x: (
-                x.metadata.get("date_recorded"),
-                x.metadata.get("date_stored"),
+        new_objects = [obj for obj in objects if obj not in self.objects]
+        if new_objects:
+            self.objects.extend(new_objects)
+            self.objects.sort(
+                key=lambda x: (
+                    x.metadata.get("date_recorded"),
+                    x.metadata.get("date_stored"),
+                )
             )
-        )
+        else:
+            print("No new objects to add.")
 
     def add_groups(self, groups):
         self.groups.extend(groups)
