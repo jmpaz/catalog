@@ -100,7 +100,7 @@ def query_command(
     debug,
     context,
 ):
-    """Query media objects or groups."""
+    """Query media objects, groups, or tags."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
@@ -108,6 +108,13 @@ def query_command(
         group_id = target.split(":", 1)[1]
         try:
             result = library.query_group(group_id)
+        except ValueError as e:
+            click.echo(str(e))
+            return
+    elif target.startswith("tag:"):
+        tag_id = target.split(":", 1)[1]
+        try:
+            result = library.query_tag(tag_id)
         except ValueError as e:
             click.echo(str(e))
             return

@@ -418,9 +418,9 @@ class Library:
                 name = obj.metadata.get("name")
                 source_filename = obj.metadata.get("source_filename", "Unnamed")
                 if name:
-                    display_name = name[:20]
+                    display_name = name
                 else:
-                    display_name = source_filename[:20]
+                    display_name = source_filename
                 object_details.append(f"{obj.id[:5]} ({display_name})")
             output.append(f"objects: {', '.join(object_details)}")
 
@@ -843,6 +843,93 @@ class Library:
             )
         else:
             raise ValueError(f"No close match found for tag: {target}")
+
+    def query_tag(self, tag_identifier):
+        # find by ID or name
+        tag = next(
+            (tag for tag in self.tags if tag["id"].startswith(tag_identifier)), None
+        )
+        if not tag:
+            # check if identifier is a name
+            potential_matches = [
+                tag
+                for tag in self.tags
+                if tag["name"].lower() == tag_identifier.lower()
+            ]
+            if len(potential_matches) == 1:
+                tag = potential_matches[0]
+            elif len(potential_matches) > 1:
+                conflict_details = "\n".join(
+                    [
+                        f"{match['name']} (ID: {match['id']})"
+                        for match in potential_matches
+                    ]
+                )
+                raise ValueError(
+                    f"Multiple matches found for tag '{tag_identifier}':\n{conflict_details}"
+                )
+            else:
+                raise ValueError(f"No tag found with identifier: {tag_identifier}")
+
+        output = [
+            f"id: {tag['id']}",
+            f"name: {tag['name']}",
+        ]
+
+        if tag.get("description"):
+            output.append(f"description: {tag['description'][:40]}")
+
+        if tag.get("parents"):
+            parent_names = [
+                f"{self.get_tag_name(parent)} ({parent[:6]})"
+                for parent in tag["parents"]
+            ]
+            output.append(f"parents: {', '.join(parent_names)}")
+
+        tagged_objects = []
+        tagged_transcripts = []
+        tagged_speech_data = []
+
+        for obj in self.media_objects:
+            if any(t["id"] == tag["id"] for t in obj.metadata.get("tags", [])):
+                tagged_objects.append(obj)
+            for entry in getattr(obj, "transcripts", []):
+                if any(t["id"] == tag["id"] for t in entry.get("tags", [])):
+                    tagged_transcripts.append((obj, entry))
+            for entry in getattr(obj, "speech_data", []):
+                if any(t["id"] == tag["id"] for t in entry.get("tags", [])):
+                    tagged_speech_data.append((obj, entry))
+
+        if tagged_objects:
+            obj_details = []
+            for obj in tagged_objects:
+                name = obj.metadata.get("name") or obj.metadata.get(
+                    "source_filename", "Unnamed"
+                )
+                obj_details.append(f"{obj.id[:6]} ({name})")
+            output.append(f"objects: {', '.join(obj_details)}")
+
+        if tagged_transcripts:
+            entry_details = []
+            for obj, entry in tagged_transcripts:
+                entry_details.append(f"{entry['id'][:6]}")
+            output.append(f"transcripts: {', '.join(entry_details)}")
+
+        if tagged_speech_data:
+            entry_details = []
+            for obj, entry in tagged_speech_data:
+                entry_details.append(f"{entry['id'][:6]}")
+            output.append(f"speech_data: {', '.join(entry_details)}")
+
+        tagged_groups = [group for group in self.groups if tag["id"] in group.tags]
+        if tagged_groups:
+            group_details = [
+                f"{group.name if group.name else 'untitled'} ({group.id[:6]})"
+                for group in tagged_groups
+            ]
+            output.append(f"groups: {', '.join(group_details)}")
+
+        return "\n".join(output)
 
     def tag_object(self, media_object, tag=None, tag_str=None, source="user"):
         if tag_str:
