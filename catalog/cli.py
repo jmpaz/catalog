@@ -499,8 +499,14 @@ def transcribe_command(
     is_flag=True,
     help="Do not copy imported files to the data directory when importing.",
 )
-def add_command(path, library, datastore, media_class, no_copy):
-    """Import media files or URLs."""
+@click.option(
+    "--recursive",
+    "-r",
+    is_flag=True,
+    help="When importing a directory, traverse and import from all subdirectories.",
+)
+def add_command(path, library, datastore, media_class, no_copy, recursive):
+    """Import media from a file/directory or URL."""
     library_path = os.path.expanduser(library)
     datastore_path = os.path.expanduser(datastore)
     library = Library(library_path, datastore_path)
@@ -508,7 +514,7 @@ def add_command(path, library, datastore, media_class, no_copy):
     initial_media_objects = library.media_objects.copy()
     imported_objects = []
 
-    for item in path:
+    def import_path(item):
         if os.path.isfile(item) or item.startswith(("http://", "https://")):
             try:
                 media_object_class = (
@@ -535,6 +541,21 @@ def add_command(path, library, datastore, media_class, no_copy):
                 click.echo(f"Error importing {item}: {str(e)}")
         else:
             click.echo(f"Skipping {item} (not a file or URL)")
+
+    def iterate_directory(directory):
+        for root, _, files in os.walk(directory):
+            for file in files:
+                import_path(os.path.join(root, file))
+
+    for item in path:
+        if os.path.isdir(item):
+            if recursive:
+                iterate_directory(item)
+            else:
+                for file in os.listdir(item):
+                    import_path(os.path.join(item, file))
+        else:
+            import_path(item)
 
     if imported_objects:
         try:
