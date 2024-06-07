@@ -424,10 +424,23 @@ def transcribe_command(
     datastore_path = os.path.expanduser(datastore)
     library = Library(library_path, datastore_path)
 
-    query_type = "group" if query and query[0].startswith("group:") else "media"
-    if query_type == "group":
-        query = [q.split(":", 1)[1] for q in query]
-    media_objects = prepare_objects(library, query, type=query_type)
+    if process_missing:
+        media_objects = [
+            obj
+            for obj in library.media_objects
+            if hasattr(obj, "can_transcribe")
+            and obj.can_transcribe()
+            and not obj.transcripts
+        ]
+        if not media_objects:
+            click.echo("No transcribable media objects found without transcripts.")
+            return
+    else:
+        query_type = "group" if query and query[0].startswith("group:") else "media"
+        if query_type == "group":
+            query = [q.split(":", 1)[1] for q in query]
+        media_objects = prepare_objects(library, query, type=query_type)
+
     click.echo(f"Media objects to transcribe: {len(media_objects)}")
 
     for media_object in media_objects:
