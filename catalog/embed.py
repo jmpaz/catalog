@@ -102,6 +102,7 @@ def reconcile_embeddings(library, device="cpu", path=EMBEDDINGS_PATH):
 
     texts = []
     locators = []
+    new_locators_set = set()
     for media_id, entry_type, entry in entries_to_embed:
         if "nodes" in entry:
             for index, node in enumerate(entry["nodes"]):
@@ -111,7 +112,16 @@ def reconcile_embeddings(library, device="cpu", path=EMBEDDINGS_PATH):
                 if locator not in existing_locators_set:
                     texts.append(content)
                     locators.append(locator)
+                new_locators_set.add(locator)
 
+    # remove redundant entries
+    indices_to_keep = [
+        i for i, locator in enumerate(existing_locators) if locator in new_locators_set
+    ]
+    final_embeddings = existing_embeddings[indices_to_keep]
+    final_locators = [existing_locators[i] for i in indices_to_keep]
+
+    # append new embeddings
     if texts:
         output = embed.text(
             texts=texts,
@@ -122,31 +132,7 @@ def reconcile_embeddings(library, device="cpu", path=EMBEDDINGS_PATH):
             device=device,
         )
         new_embeddings = np.array(output["embeddings"])
-    else:
-        print("No changes in library data.")
-        return None
-
-    combined_embeddings = np.concatenate((existing_embeddings, new_embeddings), axis=0)
-    combined_locators = existing_locators + locators
-
-    # remove embeddings/locators for entries that no longer exist
-    current_locators_set = set(
-        [
-            f"{media_object.id[:8]}:{entry_type}:{entry['id'][:5]}.nodes:{index}"
-            for media_object in library.media_objects
-            for entry_type in ["speech_data", "transcripts"]
-            for entry in getattr(media_object, entry_type, [])
-            if "nodes" in entry
-            for index in range(len(entry["nodes"]))
-        ]
-    )
-
-    indices_to_keep = [
-        i
-        for i, locator in enumerate(combined_locators)
-        if locator in current_locators_set
-    ]
-    final_embeddings = combined_embeddings[indices_to_keep]
-    final_locators = [combined_locators[i] for i in indices_to_keep]
+        final_embeddings = np.concatenate((final_embeddings, new_embeddings), axis=0)
+        final_locators.extend(locators)
 
     save_embeddings(final_embeddings, final_locators, path)
