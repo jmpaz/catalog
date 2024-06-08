@@ -598,9 +598,51 @@ class Library:
                 os.makedirs(media_dir, exist_ok=True)
                 self.create_obj_pointer(media_object, media_dir)
 
+    def create_group_pointer(self, group, groups_dir):
+        def get_group_name(group_id):
+            group = next((g for g in self.groups if g.id == group_id), None)
+            if group:
+                return group.name if group.name else "untitled"
+            else:
+                return None
+
+        os.makedirs(groups_dir, exist_ok=True)
+
+        group_name = group.name if group.name else "untitled"
+        parent_names = [
+            self.get_group_name(parent.id)
+            for parent in group.groups
+            if parent.id != group.id
+        ]
+
+        frontmatter = {"title": group_name, "group": group.id}
+
+        if parent_names:
+            frontmatter["parents"] = [f"[[{name}]]" for name in parent_names]
+
+        if group.description:
+            body = group.description
+        else:
+            body = ""
+
+        frontmatter_str = (
+            "---\n" + yaml.dump(frontmatter, default_flow_style=False) + "---\n"
+        )
+        content = f"{frontmatter_str}\n{body}"
+
+        pointer_path = os.path.join(groups_dir, f"{group_name}.md")
+
+        with open(pointer_path, "w") as file:
+            file.write(content)
+
+        print(f"Created group pointer for {group_name}")
+        return content
+
     def create_pointer(self, target, dest_path="data/pointers", mode="default"):
         if mode == "quartz":
-            if isinstance(target, str) and target.startswith("tag_"):
+            if isinstance(target, Group):
+                self.create_group_pointer(target, dest_path)
+            elif isinstance(target, str) and target.startswith("tag_"):
                 self.create_tag_pointer(target, dest_path)
             else:
                 self.create_tag_pointer(target, dest_path)
@@ -665,6 +707,16 @@ class Library:
                 with open(pointer_path, "w") as file:
                     file.write(new_content)
 
+        elif "group" in metadata:
+            group_id = metadata["group"]
+            group = next((group for group in self.groups if group.id == group_id), None)
+            if group:
+                new_content = self.create_group_pointer(
+                    group, os.path.dirname(pointer_path)
+                )
+                with open(pointer_path, "w") as file:
+                    file.write(new_content)
+
     def sync_pointers(self, target_dir):
         def read_pointers(target_dir):
             pointers = {}
@@ -677,7 +729,11 @@ class Library:
                             try:
                                 frontmatter, _ = content.split("---", 2)[1:]
                                 metadata = yaml.safe_load(frontmatter)
-                                id_key = metadata.get("obj") or metadata.get("tag")
+                                id_key = (
+                                    metadata.get("obj")
+                                    or metadata.get("tag")
+                                    or metadata.get("group")
+                                )
                                 if id_key:
                                     pointers[id_key] = path
                             except Exception as e:
@@ -690,6 +746,8 @@ class Library:
                 library_state[obj.id] = "object"
             for tag in library.tags:
                 library_state[tag["id"]] = "tag"
+            for group in library.groups:
+                library_state[group.id] = "group"
 
             missing = {
                 id: typ for id, typ in library_state.items() if id not in pointers
@@ -711,6 +769,10 @@ class Library:
                     library.create_pointer(obj, dest_path=obj_dir)
                 elif typ == "tag":
                     library.create_pointer(id, dest_path=target_dir, mode="quartz")
+                elif typ == "group":
+                    group = next(group for group in library.groups if group.id == id)
+                    group_dir = os.path.join(target_dir, "groups")
+                    library.create_pointer(group, dest_path=group_dir, mode="quartz")
 
             for id, path in outdated.items():
                 library.update_pointer(path)
