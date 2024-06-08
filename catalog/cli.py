@@ -1306,7 +1306,7 @@ def manage_group(action, group_str, param, library, parent):
 
 
 @click.command("search")
-@click.argument("query")
+@click.argument("query", required=False)
 @click.option(
     "--mode",
     type=click.Choice(["exact", "fuzzy", "embeddings"]),
@@ -1374,6 +1374,9 @@ def search_command(
     if sync:
         click.echo("Updating embeddings...")
         reconcile_embeddings(library, device="gpu")
+        click.echo("Embeddings updated.")
+        if not query:
+            return
 
     if use_embeddings or mode == "embeddings":
         embeddings, locators = load_embeddings()
