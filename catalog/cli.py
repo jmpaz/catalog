@@ -593,7 +593,13 @@ def add_command(path, library, datastore, media_class, no_copy, recursive):
     type=str,
     help="Sort by specified fields (created, modified, stored, class, segments, transcripts, processed). Add :asc for ascending order (e.g., stored:asc). Multiple sorts can be comma-separated (e.g., class:asc,stored).",
 )
-def ls_command(obj_target, library, tags, groups, page, sort):
+@click.option(
+    "--show",
+    type=click.Choice(["count", "list"]),
+    default="count",
+    help="Whether to populate cells for groups/tags/entries with a count (default), or with a list of IDs.",
+)
+def ls_command(obj_target, library, tags, groups, page, sort, show):
     """List media objects in the library. Provide a target (eg 6e24a:speech_data) to list designated entries for a specific object; use --tags or --groups to list all objects of that type."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
@@ -661,6 +667,10 @@ def ls_command(obj_target, library, tags, groups, page, sort):
             return obj.__class__.__name__
         elif sort_field == "processed":
             return len(getattr(obj, "speech_data", []))
+        elif sort_field == "tags":
+            return len(getattr(obj, "metadata", {}).get("tags", []))
+        elif sort_field == "groups":
+            return len([g for g in library.groups if obj in g.objects])
         return None
 
     if sort:
@@ -683,6 +693,8 @@ def ls_command(obj_target, library, tags, groups, page, sort):
             "transcripts",
             "processed",
             "recorded",
+            "tags",
+            "groups",
         ]:
             raise ValueError(f"Invalid sort field: {sort_field}")
 
@@ -695,8 +707,9 @@ def ls_command(obj_target, library, tags, groups, page, sort):
     table.add_column("ID", no_wrap=True)
     table.add_column("Name")
     table.add_column("Class")
-    table.add_column("People")
     table.add_column("Segments", justify="right")
+    table.add_column("Tags", justify="right")
+    table.add_column("Groups", justify="right")
     table.add_column("Transcripts", justify="right")
     table.add_column("Processed", justify="right")
     table.add_column("Date Recorded", justify="right")
@@ -715,19 +728,56 @@ def ls_command(obj_target, library, tags, groups, page, sort):
         else:
             segments_count = 0
 
-        transcripts_count = len(getattr(obj, "transcripts", []))
-        processed_count = len(getattr(obj, "speech_data", []))
-        people = (
-            [name for name in obj.participants]
-            if "participants" in obj.__dict__
-            else []
+        transcripts_count = (
+            len(getattr(obj, "transcripts", [])) if hasattr(obj, "transcripts") else 0
         )
-        people_str = ", ".join(people)
+        processed_count = (
+            len(getattr(obj, "speech_data", [])) if hasattr(obj, "speech_data") else 0
+        )
+
+        tags_count = len(obj.metadata.get("tags", []))
+        groups_count = len([g for g in library.groups if obj in g.objects])
 
         if recorded:
             recorded = datetime.fromisoformat(recorded).strftime("%Y-%m-%d %H:%M:%S")
         if stored:
             stored = datetime.fromisoformat(stored).strftime("%Y-%m-%d %H:%M:%S")
+
+        tags_list = ", ".join(
+            [
+                f"{library.get_tag_name(tag['id'], mode='name')} ({tag['id'][:5]})"
+                for tag in obj.metadata.get("tags", [])
+            ]
+        )
+        groups_list = ", ".join(
+            [
+                f"{group.name} ({group.id[:5]})"
+                for group in library.groups
+                if obj in group.objects
+            ]
+        )
+
+        transcripts_list = (
+            ", ".join([entry["id"][:5] for entry in obj.transcripts])
+            if hasattr(obj, "transcripts")
+            else ""
+        )
+        processed_list = (
+            ", ".join([entry["id"][:5] for entry in obj.speech_data])
+            if hasattr(obj, "speech_data")
+            else ""
+        )
+
+        if show == "list":
+            tags_column = tags_list
+            groups_column = groups_list
+            transcripts_column = transcripts_list
+            processed_column = processed_list
+        else:
+            tags_column = str(tags_count)
+            groups_column = str(groups_count)
+            transcripts_column = str(transcripts_count)
+            processed_column = str(processed_count)
 
         table.add_row(
             obj.id[:6],
@@ -735,10 +785,11 @@ def ls_command(obj_target, library, tags, groups, page, sort):
             if obj.metadata.get("name")
             else obj.metadata.get("source_filename", ""),
             obj.__class__.__name__,
-            str(people_str),
             str(segments_count),
-            str(transcripts_count),
-            str(processed_count),
+            tags_column,
+            groups_column,
+            transcripts_column,
+            processed_column,
             recorded,
             stored,
         )

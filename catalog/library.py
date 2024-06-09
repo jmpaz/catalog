@@ -784,7 +784,7 @@ class Library:
         missing, outdated, extra = compare_state(self, pointers)
         update_target_dir(self, target_dir, missing, outdated, extra)
 
-    def get_tag_name(self, tag_id):
+    def get_tag_name(self, tag_id, mode="full"):
         tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
         if not tag:
             raise ValueError(f"No tag found with ID: {tag_id}")
@@ -798,7 +798,10 @@ class Library:
             else:
                 break
 
-        return "/".join(parts)
+        if mode == "full":
+            return "/".join(parts)
+        elif mode == "name":
+            return parts[-1]
 
     def count_tag_assignments(self, tag_id):
         count = 0
