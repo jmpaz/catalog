@@ -551,7 +551,7 @@ class Library:
                 parent_tag_path = os.path.join(parent_tag_path, part)
                 parent_pointer_path = os.path.join(tags_dir, f"{part}.md")
                 if not os.path.exists(parent_pointer_path):
-                    parent_pointer_content = f"---\ntitle: {part}\ntag: {tag_id}\n---\n"
+                    parent_pointer_content = f"---\ntitle: {part}\nid: {tag_id}\n---\n"
                     write_pointer_file(parent_pointer_path, parent_pointer_content)
 
         tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
@@ -594,7 +594,7 @@ class Library:
 
         # create tag pointers
         tag_name = tag_path_parts[-1]
-        pointer_content = f"---\ntitle: {tag_name}\ntag: {tag['id']}\n---\n"
+        pointer_content = f"---\ntitle: {tag_name}\nid: {tag['id']}\n---\n"
         if tag.get("description"):
             pointer_content += f"\n{tag['description']}\n"
         pointer_path = os.path.join(tag_path, f"{tag_name}.md")
@@ -764,7 +764,7 @@ class Library:
             tag_id = metadata["tag"]
             tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
             if tag:
-                new_content = f"---\ntitle: {tag['name']}\ntag: {tag_id}\n---\n{tag.get('description', '')}"
+                new_content = f"---\ntitle: {tag['name']}\nid: {tag_id}\n---\n{tag.get('description', '')}"
                 with open(pointer_path, "w") as file:
                     file.write(new_content)
 
