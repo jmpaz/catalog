@@ -533,6 +533,27 @@ class Library:
         write_file(dest_path, filename, content)
 
     def create_tag_pointer(self, tag_id, tags_dir):
+        def write_pointer_file(pointer_path, content):
+            try:
+                with open(pointer_path, "w") as file:
+                    file.write(content)
+                print(
+                    f"Created pointer for {os.path.basename(pointer_path).replace('.md', '')}"
+                )
+            except Exception as e:
+                print(
+                    f"Error creating pointer for {os.path.basename(pointer_path).replace('.md', '')}: {str(e)}"
+                )
+
+        def create_parent_pointers(tag_path_parts, tags_dir, tag_id):
+            parent_tag_path = tags_dir
+            for part in tag_path_parts[:-1]:
+                parent_tag_path = os.path.join(parent_tag_path, part)
+                parent_pointer_path = os.path.join(tags_dir, f"{part}.md")
+                if not os.path.exists(parent_pointer_path):
+                    parent_pointer_content = f"---\ntitle: {part}\ntag: {tag_id}\n---\n"
+                    write_pointer_file(parent_pointer_path, parent_pointer_content)
+
         tag = next((tag for tag in self.tags if tag["id"] == tag_id), None)
         if not tag:
             print(f"No tag found with ID: {tag_id}")
@@ -571,21 +592,16 @@ class Library:
         tag_path = os.path.join(tags_dir, *tag_path_parts[:-1])
         os.makedirs(tag_path, exist_ok=True)
 
-        # create tag pointer alongside folder
+        # create tag pointers
         tag_name = tag_path_parts[-1]
         pointer_content = f"---\ntitle: {tag_name}\ntag: {tag['id']}\n---\n"
         if tag.get("description"):
             pointer_content += f"\n{tag['description']}\n"
         pointer_path = os.path.join(tag_path, f"{tag_name}.md")
+        write_pointer_file(pointer_path, pointer_content)
+        create_parent_pointers(tag_path_parts, tags_dir, tag_id)
 
-        try:
-            with open(pointer_path, "w") as file:
-                file.write(pointer_content)
-            print(f"Created tag pointer for {tag_name}")
-        except Exception as e:
-            print(f"Error creating tag pointer for {tag_name}: {str(e)}")
-
-        # recursively create child tags
+        # creater pointers for child tags
         for child_tag in self.tags:
             if tag_id in child_tag.get("parents", []):
                 self.create_tag_pointer(child_tag["id"], tags_dir)
@@ -638,16 +654,61 @@ class Library:
         print(f"Created group pointer for {group_name}")
         return content
 
+    def fetch_all_tagged_objects(self, library, tag_id):
+        tagged_objects = []
+        tagged_objects.extend(
+            [
+                obj
+                for obj in library.media_objects
+                if any(t["id"] == tag_id for t in obj.metadata.get("tags", []))
+            ]
+        )
+        for child_tag in library.tags:
+            if tag_id in child_tag.get("parents", []):
+                tagged_objects.extend(
+                    self.fetch_all_tagged_objects(library, child_tag["id"])
+                )
+        return tagged_objects
+
     def create_pointer(self, target, dest_path="data/pointers", mode="default"):
-        if mode == "quartz":
-            if isinstance(target, Group):
-                self.create_group_pointer(target, dest_path)
-            elif isinstance(target, str) and target.startswith("tag_"):
-                self.create_tag_pointer(target, dest_path)
-            else:
-                self.create_tag_pointer(target, dest_path)
+        processed_groups = set()
+
+        def process_group(group):
+            group_dir = os.path.join(dest_path, "groups")
+            if group.id not in processed_groups:
+                self.create_group_pointer(group, group_dir)
+                processed_groups.add(group.id)
+                for subgroup in group.groups:
+                    process_group(subgroup)
+                    for obj in subgroup.objects:
+                        media_dir = os.path.join(
+                            dest_path, "media", obj.__class__.__name__.lower()
+                        )
+                        self.create_obj_pointer(obj, media_dir)
+
+        if isinstance(target, Group):
+            process_group(target)
+            for obj in target.objects:
+                media_dir = os.path.join(
+                    dest_path, "media", obj.__class__.__name__.lower()
+                )
+                self.create_obj_pointer(obj, media_dir)
+        elif isinstance(target, str) and target.startswith("tag_"):
+            self.create_tag_pointer(target, dest_path)
+            for obj in self.fetch_all_tagged_objects(self, target):
+                media_type = obj.__class__.__name__.lower()
+                media_dir = os.path.join(dest_path, "media", media_type)
+                self.create_obj_pointer(obj, media_dir)
+        elif isinstance(target, str):
+            self.create_tag_pointer(target, dest_path)
+            for obj in self.fetch_all_tagged_objects(self, target):
+                media_type = obj.__class__.__name__.lower()
+                media_dir = os.path.join(dest_path, "media", media_type)
+                self.create_obj_pointer(obj, media_dir)
         else:
-            self.create_obj_pointer(target, dest_path)
+            media_type = target.__class__.__name__.lower()
+            media_dir = os.path.join(dest_path, "media", media_type)
+            self.create_obj_pointer(target, media_dir)
 
     def update_pointer(self, pointer_path):
         with open(pointer_path, "r") as file:

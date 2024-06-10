@@ -964,33 +964,52 @@ def rm_command(targets, library, delete_file):
     default=".",
     help="Destination path for the generated pointers (default: current directory).",
 )
-@click.option("--mode", type=click.Choice(["default", "quartz"]), default="default")
+@click.option("--mode", type=click.Choice(["default", "full"]), default="default")
 def markdown_pointers_command(targets, library, output_dir, mode):
-    """Create Markdown files composed of specified objects' metadata + textual representation ('default'), or all objects, along with all associated tags ('quartz').
+    """Create Markdown files composed of specified objects' metadata + textual representation ('default'), or all objects, along with all associated tags and groups ('full')."""
 
-    Targets can be media object IDs or file paths (which will be imported or matched to existing objects)."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
-    if mode == "quartz":
+    if mode == "full":
         library.sync_pointers(output_dir)
     else:
-        # create object pointers
         if not targets:
-            media_objects = library.media_objects
-        else:
-            media_objects = prepare_objects(library, targets)
+            click.echo("Error: No targets provided.")
+            return
 
-        for media_object in media_objects:
-            try:
-                library.create_pointer(media_object, dest_path=output_dir, mode=mode)
-                click.echo(
-                    f"Created pointer for {media_object.id[:5]} ({media_object.__class__.__name__})"
-                )
-            except Exception as e:
-                click.echo(
-                    f"Error creating pointer for {media_object.id[:5]}: {str(e)}"
-                )
+        for target in targets:
+            if target.startswith("group:"):
+                group_id = target.split(":", 1)[1]
+                try:
+                    group = library.fetch_group(group_id)
+                    if group:
+                        library.create_pointer(group, dest_path=output_dir, mode=mode)
+                    else:
+                        click.echo(f"No group found with ID: {group_id}")
+                except ValueError as e:
+                    click.echo(str(e))
+            elif target.startswith("tag:"):
+                tag_str = target.split(":", 1)[1]
+                try:
+                    tag_id = library.get_tag_id(tag_str)
+                    library.create_pointer(tag_id, dest_path=output_dir, mode=mode)
+                except ValueError as e:
+                    click.echo(str(e))
+            else:
+                media_objects = library.fetch([target])
+                for media_object in media_objects:
+                    try:
+                        library.create_pointer(
+                            media_object, dest_path=output_dir, mode=mode
+                        )
+                        click.echo(
+                            f"Created pointer for {media_object.id[:5]} ({media_object.__class__.__name__})"
+                        )
+                    except Exception as e:
+                        click.echo(
+                            f"Error creating pointer for {media_object.id[:5]}: {str(e)}"
+                        )
 
 
 @click.command("process")
