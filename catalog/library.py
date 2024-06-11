@@ -232,6 +232,13 @@ class Library:
             token_count = call_tiktoken(media_object.text)["count"]
             output.append(f"text: Exists ({token_count} tokens)")
 
+        groups = []
+        for group in self.groups:
+            if any(obj.id == media_object.id for obj in group.objects):
+                groups.append(group)
+        if groups:
+            output.append(f"groups: {', '.join([group.name for group in groups])}")
+
         if media_object.metadata.get("tags"):
             tags = [
                 self.get_tag_name(tag["id"])
