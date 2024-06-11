@@ -39,6 +39,52 @@ def extract_metadata(file_path):
     return {"creation_time": creation_time, "duration": duration}
 
 
+def detect_depth(text):
+    """Assess indentation depth of a string to determine if it should be flattened."""
+    lines = text.split("\n")
+    indent_sizes = []
+    current_indent = None
+    deepest_indent = 0
+    unclosed_nests = 0
+
+    for line in lines:
+        stripped_line = line.lstrip()
+        if not stripped_line or stripped_line.startswith("#"):
+            continue  # Skip empty lines and headings
+        indent_size = len(line) - len(stripped_line)
+        if current_indent is None:
+            current_indent = indent_size
+        if indent_size > deepest_indent:
+            deepest_indent = indent_size
+        if indent_size > current_indent:
+            unclosed_nests += 1
+        else:
+            unclosed_nests -= 1 if unclosed_nests > 0 else 0
+        indent_sizes.append(indent_size)
+        current_indent = indent_size
+
+    return unclosed_nests > (len(indent_sizes) - unclosed_nests)
+
+
+def flatten_markdown(text):
+    lines = text.split("\n")
+    flattened_lines = []
+    within_chunk = False
+
+    for line in lines:
+        stripped_line = line.lstrip()
+        if not stripped_line or stripped_line.startswith("#"):
+            flattened_lines.append(line)  # Keep headings and empty lines as is
+            continue
+        if detect_depth("\n".join(lines[lines.index(line) :])):
+            within_chunk = True
+        if within_chunk:
+            flattened_lines.append(stripped_line)
+        else:
+            flattened_lines.append(line)
+    return "\n".join(flattened_lines)
+
+
 def format_speech_data(speech_data, minimal=False):
     def _calculate_depth(nodes, index):
         depth = 0

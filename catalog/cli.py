@@ -965,7 +965,12 @@ def rm_command(targets, library, delete_file):
     help="Destination path for the generated pointers (default: current directory).",
 )
 @click.option("--mode", type=click.Choice(["default", "full"]), default="default")
-def markdown_pointers_command(targets, library, output_dir, mode):
+@click.option(
+    "--flatten",
+    is_flag=True,
+    help="Flatten indentation as needed to handle excessive nesting.",
+)
+def markdown_pointers_command(targets, library, output_dir, mode, flatten):
     """Create Markdown files composed of specified objects' metadata + textual representation ('default'), or all objects, along with all associated tags and groups ('full')."""
 
     library_path = os.path.expanduser(library)
@@ -984,7 +989,12 @@ def markdown_pointers_command(targets, library, output_dir, mode):
                 try:
                     group = library.fetch_group(group_id)
                     if group:
-                        library.create_pointer(group, dest_path=output_dir, mode=mode)
+                        library.create_pointer(
+                            group,
+                            dest_path=output_dir,
+                            mode=mode,
+                            flatten_excess=flatten,
+                        )
                     else:
                         click.echo(f"No group found with ID: {group_id}")
                 except ValueError as e:
@@ -993,7 +1003,9 @@ def markdown_pointers_command(targets, library, output_dir, mode):
                 tag_str = target.split(":", 1)[1]
                 try:
                     tag_id = library.get_tag_id(tag_str)
-                    library.create_pointer(tag_id, dest_path=output_dir, mode=mode)
+                    library.create_pointer(
+                        tag_id, dest_path=output_dir, mode=mode, flatten_excess=flatten
+                    )
                 except ValueError as e:
                     click.echo(str(e))
             else:
@@ -1001,7 +1013,10 @@ def markdown_pointers_command(targets, library, output_dir, mode):
                 for media_object in media_objects:
                     try:
                         library.create_pointer(
-                            media_object, dest_path=output_dir, mode=mode
+                            media_object,
+                            dest_path=output_dir,
+                            mode=mode,
+                            flatten_excess=flatten,
                         )
                         click.echo(
                             f"Created pointer for {media_object.id[:5]} ({media_object.__class__.__name__})"

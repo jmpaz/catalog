@@ -5,7 +5,13 @@ import tempfile
 import yt_dlp
 from abc import ABC
 from catalog.process import format_transcript
-from catalog.utils import format_speech_data, format_transcript_nodes, extract_metadata
+from catalog.utils import (
+    format_speech_data,
+    format_transcript_nodes,
+    extract_metadata,
+    detect_depth,
+    flatten_markdown,
+)
 
 from contextualize.reference import process_text as delimit_text
 
@@ -177,29 +183,36 @@ class Video(MediaObject):
         self.transcripts = []
         self.speech_data = []
 
-    def get_markdown_str(self, minimal=True):
+    def get_markdown_str(self, minimal=True, flatten_excess=False):
         if self.speech_data:
-            return format_speech_data([self.speech_data[-1]], minimal)
+            text = format_speech_data([self.speech_data[-1]], minimal)
         elif self.transcripts:
-            return format_transcript_nodes([self.transcripts[-1]], minimal)
+            text = format_transcript_nodes([self.transcripts[-1]], minimal)
         else:
-            return f"# {self.metadata.get('name', 'Unnamed Video')}\n\nNo transcription available."
+            text = f"# {self.metadata.get('name', 'Unnamed Video')}\n\nNo transcription available."
+
+        if flatten_excess and detect_depth(text):
+            return flatten_markdown(text)
+        return text @ can_transcribe
 
 
-@can_transcribe
 class Audio(MediaObject):
     def __init__(self, file_path=None, url=None, name=None, source_filename=None):
         super().__init__(file_path, url, name)
         self.transcripts = []
         self.speech_data = []
 
-    def get_markdown_str(self, minimal=True):
+    def get_markdown_str(self, minimal=True, flatten_excess=False):
         if self.speech_data:
-            return format_speech_data([self.speech_data[-1]], minimal)
+            text = format_speech_data([self.speech_data[-1]], minimal)
         elif self.transcripts:
-            return format_transcript_nodes([self.transcripts[-1]], minimal)
+            text = format_transcript_nodes([self.transcripts[-1]], minimal)
         else:
-            return f"# {self.metadata.get('name', 'Unnamed Audio')}\n\nNo transcription available."
+            text = f"# {self.metadata.get('name', 'Unnamed Audio')}\n\nNo transcription available."
+
+        if flatten_excess and detect_depth(text):
+            return flatten_markdown(text)
+        return text
 
 
 class Voice(Audio):

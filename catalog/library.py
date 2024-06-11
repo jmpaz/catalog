@@ -470,7 +470,9 @@ class Library:
         else:
             print(f"{' ' * indent}{value}")
 
-    def create_obj_pointer(self, media_object, dest_path="data/pointers"):
+    def create_obj_pointer(
+        self, media_object, dest_path="data/pointers", flatten_excess=False
+    ):
         def write_file(path, name, content):
             os.makedirs(path, exist_ok=True)
             with open(os.path.join(path, name), "w") as file:
@@ -530,7 +532,7 @@ class Library:
         )
 
         try:
-            body = media_object.get_markdown_str()
+            body = media_object.get_markdown_str(flatten_excess=flatten_excess)
         except NotImplementedError:
             body = ""
 
@@ -677,7 +679,9 @@ class Library:
                 )
         return tagged_objects
 
-    def create_pointer(self, target, dest_path="data/pointers", mode="default"):
+    def create_pointer(
+        self, target, dest_path="data/pointers", mode="default", flatten_excess=False
+    ):
         processed_groups = set()
 
         def process_group(group):
@@ -691,7 +695,9 @@ class Library:
                         media_dir = os.path.join(
                             dest_path, "media", obj.__class__.__name__.lower()
                         )
-                        self.create_obj_pointer(obj, media_dir)
+                        self.create_obj_pointer(
+                            obj, media_dir, flatten_excess=flatten_excess
+                        )
 
         if isinstance(target, Group):
             process_group(target)
@@ -699,23 +705,23 @@ class Library:
                 media_dir = os.path.join(
                     dest_path, "media", obj.__class__.__name__.lower()
                 )
-                self.create_obj_pointer(obj, media_dir)
+                self.create_obj_pointer(obj, media_dir, flatten_excess=flatten_excess)
         elif isinstance(target, str) and target.startswith("tag_"):
             self.create_tag_pointer(target, dest_path)
             for obj in self.fetch_all_tagged_objects(self, target):
                 media_type = obj.__class__.__name__.lower()
                 media_dir = os.path.join(dest_path, "media", media_type)
-                self.create_obj_pointer(obj, media_dir)
+                self.create_obj_pointer(obj, media_dir, flatten_excess=flatten_excess)
         elif isinstance(target, str):
             self.create_tag_pointer(target, dest_path)
             for obj in self.fetch_all_tagged_objects(self, target):
                 media_type = obj.__class__.__name__.lower()
                 media_dir = os.path.join(dest_path, "media", media_type)
-                self.create_obj_pointer(obj, media_dir)
+                self.create_obj_pointer(obj, media_dir, flatten_excess=flatten_excess)
         else:
             media_type = target.__class__.__name__.lower()
             media_dir = os.path.join(dest_path, "media", media_type)
-            self.create_obj_pointer(target, media_dir)
+            self.create_obj_pointer(target, media_dir, flatten_excess=flatten_excess)
 
     def update_pointer(self, pointer_path):
         with open(pointer_path, "r") as file:
