@@ -485,8 +485,6 @@ class Library:
             or object_id
         )
         obj_type = media_object.__class__.__name__.lower()
-        date_prepared = datetime.now().isoformat()
-        source_filename = media_object.metadata.get("source_filename")
 
         if media_object.metadata.get("tags"):
             tags = [
@@ -499,19 +497,22 @@ class Library:
 
         frontmatter = {
             "tags": tags_str,
-            "obj": object_id,
-            "source_filename": source_filename,
+            "obj": object_id[:8],
+            "date": media_object.metadata.get("date_recorded")
+            or media_object.metadata.get("date_stored"),
+            # "date_prepared": datetime.now().isoformat(),
         }
 
         if hasattr(media_object, "speech_data") and media_object.speech_data:
             latest_entry = media_object.speech_data[-1]
-            frontmatter.update(
-                {
-                    "speech_data": latest_entry["id"],
-                    "section_count": len(latest_entry.get("sections", [])),
-                    "node_count": len(latest_entry.get("nodes", [])),
-                }
-            )
+            # commenting out until quartz is updated to ignore this + date_prepared
+            # frontmatter.update(
+            #     {
+            #         "speech_data": latest_entry["id"],
+            #         "section_count": len(latest_entry.get("sections", [])),
+            #         "node_count": len(latest_entry.get("nodes", [])),
+            #     }
+            # )
         elif hasattr(media_object, "transcripts") and media_object.transcripts:
             latest_entry = media_object.transcripts[-1]
             frontmatter.update(
@@ -520,8 +521,6 @@ class Library:
                     "node_count": len(latest_entry.get("nodes", [])),
                 }
             )
-
-        frontmatter["prepared"] = date_prepared
 
         frontmatter_str = (
             "---\n"
