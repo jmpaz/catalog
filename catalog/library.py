@@ -486,14 +486,27 @@ class Library:
         )
         obj_type = media_object.__class__.__name__.lower()
 
-        if media_object.metadata.get("tags"):
-            tags = [
-                self.get_tag_name(tag["id"])
-                for tag in media_object.metadata.get("tags")
-            ]
-            tags_str = f"{f'media/{obj_type}'}, {', '.join(tags)}"
-        else:
-            tags_str = f"media/{obj_type}"
+        # filter out tags descended from 'meta'
+        tags = []
+        for tag in media_object.metadata.get("tags", []):
+            tag_obj = next((t for t in self.tags if t["id"] == tag["id"]), None)
+            if not tag_obj:
+                continue
+            is_meta = False
+            current_tag = tag_obj
+            while current_tag.get("parents"):
+                parent_id = current_tag["parents"][0]
+                parent_tag = next((t for t in self.tags if t["id"] == parent_id), None)
+                if parent_tag and parent_tag["name"].lower() == "meta":
+                    is_meta = True
+                    break
+                current_tag = parent_tag
+            if not is_meta:
+                tags.append(self.get_tag_name(tag["id"]))
+
+        tags_str = (
+            f"media/{obj_type}, " + ", ".join(tags) if tags else f"media/{obj_type}"
+        )
 
         frontmatter = {
             "tags": tags_str,
@@ -579,16 +592,6 @@ class Library:
                 print(f"Skipping tag '{tag['name']}' as it has 'meta' as an ancestor.")
                 return
             current_tag = parent_tag
-
-        has_children = any(
-            tag_id in child_tag.get("parents", []) for child_tag in self.tags
-        )
-
-        if self.count_tag_assignments(tag_id) == 0 and not has_children:
-            print(
-                f"Skipping tag '{tag['name']}' as it has no assignments and no children."
-            )
-            return
 
         # create tag path
         tag_path_parts = [tag["name"]]
