@@ -1225,7 +1225,7 @@ def tag_command(target, tag_str, create, library, remove):
     help="Parent tag or group name or ID to set or remove.",
 )
 def manage_command(target, action, param, library, parent):
-    """Manage tags and groups of specified media objects. Usage: 'manage [tag|group]:[id|name] [action] [param]'."""
+    """Manage a tag, group, or media object. Usage: 'manage [tag|group]:[id|tag/group name] [action] [param]'."""
     library_path = os.path.expanduser(library)
     library = Library(library_path)
 
@@ -1236,7 +1236,25 @@ def manage_command(target, action, param, library, parent):
         group_str = target.split(":", 1)[1]
         manage_group(action, group_str, param, library, parent)
     else:
-        click.echo("Error: Target must start with 'tag:' or 'group:'")
+        manage_object(action, target, param, library)
+
+
+def manage_object(action, obj_id, param, library):
+    try:
+        media_object = library.fetch([obj_id])[0]
+
+        if action == "rename":
+            if not param:
+                click.echo("Error: New name is required to rename an object.")
+                return
+            media_object.metadata["name"] = param
+            library.save_library()
+            click.echo(f"Object '{media_object.id}' renamed to '{param}'.")
+
+    except ValueError as e:
+        click.echo(f"Error: {str(e)}")
+    except Exception as e:
+        click.echo(f"Unexpected error: {str(e)}")
 
 
 def manage_tag(action, tag_str, param, library, parent):
