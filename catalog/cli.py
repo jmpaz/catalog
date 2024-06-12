@@ -1253,8 +1253,8 @@ def manage_object(action, obj_id, param, library):
 
         elif action == "set-desc":
             if not param:
-                click.echo("Error: Description is required to set description.")
-                return
+                if click.confirm("No description provided. Clear?", default=True):
+                    media_object.description = ""
             if os.path.isfile(param):
                 with open(param, "r") as file:
                     media_object.description = file.read().strip()
