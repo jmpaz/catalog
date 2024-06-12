@@ -1251,6 +1251,18 @@ def manage_object(action, obj_id, param, library):
             library.save_library()
             click.echo(f"Object '{media_object.id}' renamed to '{param}'.")
 
+        elif action == "set-desc":
+            if not param:
+                click.echo("Error: Description is required to set description.")
+                return
+            if os.path.isfile(param):
+                with open(param, "r") as file:
+                    media_object.description = file.read().strip()
+            else:
+                media_object.description = param.strip()
+            library.save_library()
+            click.echo(f"Description for object '{media_object.id}' updated.")
+
     except ValueError as e:
         click.echo(f"Error: {str(e)}")
     except Exception as e:

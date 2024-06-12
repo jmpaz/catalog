@@ -50,6 +50,7 @@ class MediaObject(ABC):
             if self.file_path
             else None,
         }
+        self.description = ""
 
         if not self.metadata["date_stored"]:
             self.metadata["date_stored"] = datetime.now().isoformat()

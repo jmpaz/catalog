@@ -536,6 +536,9 @@ class Library:
         except NotImplementedError:
             body = ""
 
+        if media_object.description:
+            body = f"_{media_object.description}_\n\n---\n\n{body}"
+
         content = f"{frontmatter_str}\n\n{body}".strip()
 
         filename = f"{name}.md" if not name.endswith(".md") else name
