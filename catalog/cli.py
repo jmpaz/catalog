@@ -107,14 +107,14 @@ def query_command(
     if target.startswith("group:"):
         group_id = target.split(":", 1)[1]
         try:
-            result = library.query_group(group_id)
+            result = library.query_group(group_id, output="str")
         except ValueError as e:
             click.echo(str(e))
             return
     elif target.startswith("tag:"):
         tag_id = target.split(":", 1)[1]
         try:
-            result = library.query_tag(tag_id)
+            result = library.query_tag(tag_id, output="str")
         except ValueError as e:
             click.echo(str(e))
             return
@@ -201,7 +201,7 @@ def query_command(
                 else:
                     result = entries
         else:
-            result = library.query(media_object)
+            result = library.query(media_object, output="str")
 
     if action:
         output = None  # do not output to console

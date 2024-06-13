@@ -9,7 +9,6 @@ from fuzzywuzzy import process as fuzzy_process
 from datetime import datetime
 from catalog.media import MediaObject
 from catalog.utils import fetch_subtarget_entry
-from contextualize.tokenize import call_tiktoken
 import uuid
 
 
@@ -198,74 +197,162 @@ class Library:
         with open(self.library_path, "w") as file:
             json.dump(library_data, file, indent=2)
 
-    def query(self, media_object):
+    def query(self, media_object, output="dict"):
         if not isinstance(media_object, MediaObject):
             raise ValueError("Invalid media object")
 
-        output = []
-        output.append(f"id: {media_object.id}")
+        data = {
+            "id": media_object.id,
+            "name": media_object.metadata.get("name"),
+            "object_class": media_object.__class__.__name__,
+            "dates": {
+                "date_created": media_object.metadata.get("date_created"),
+                "date_modified": media_object.metadata.get("date_modified"),
+                "date_stored": media_object.metadata.get("date_stored"),
+                "date_recorded": media_object.metadata.get("date_recorded"),
+            },
+            "source_filename": media_object.metadata.get("source_filename"),
+            "file_path": media_object.file_path,
+            "groups": [
+                {"name": group.name, "id": group.id[:8]}
+                for group in self.groups
+                if media_object in group.objects
+            ],
+            "tags": [
+                {"name": self.get_tag_name(tag["id"]), "id": tag["id"][:8]}
+                for tag in media_object.metadata.get("tags", [])
+            ],
+            "text": bool(media_object.text),
+            "processed_text": len(media_object.processed_text),
+            "transcripts": [f'{entry["id"][:8]}' for entry in media_object.transcripts]
+            if hasattr(media_object, "transcripts") and media_object.transcripts
+            else [],
+            "speech_data": [f'{entry["id"][:8]}' for entry in media_object.speech_data]
+            if hasattr(media_object, "speech_data") and media_object.speech_data
+            else [],
+            "chat_data": {
+                "participants_count": len(media_object.participants)
+                if hasattr(media_object, "participants")
+                else 0,
+                "messages_count": len(media_object.messages)
+                if hasattr(media_object, "messages")
+                else 0,
+                "chat_metadata_count": len(media_object.chat_metadata)
+                if hasattr(media_object, "chat_metadata")
+                else 0,
+            }
+            if hasattr(media_object, "chat_data")
+            else {},
+        }
 
-        name = media_object.metadata.get("name")
-        if name:
-            output.append(f"name: {name}")
+        if output == "str":
+            return self._format_query_str(data)
+        return data
 
-        output.append(f"object_class: {media_object.__class__.__name__}")
+    def query_group(self, group_id, output="dict"):
+        group = self.fetch_group(group_id)
+        if not group:
+            raise ValueError(f"No group found with ID: {group_id}")
 
-        for date_key in [
-            "date_created",
-            "date_modified",
-            "date_stored",
-            "date_recorded",
-        ]:
-            date_value = media_object.metadata.get(date_key)
-            if date_value:
-                output.append(f"{date_key}: {date_value}")
+        data = {
+            "id": group.id,
+            "name": group.name if group.name else "untitled",
+            "created_by": group.created_by,
+            "date_created": group.date_created,
+            "description": group.description[:40],
+            "objects": [
+                {
+                    "id": obj.id[:8],
+                    "name": obj.metadata.get("name", "")
+                    if obj.metadata.get("name")
+                    else obj.metadata.get("source_filename", ""),
+                }
+                for obj in group.objects
+            ],
+            "subgroups": [
+                {
+                    "id": subgroup.id[:8],
+                    "name": subgroup.name if subgroup.name else "untitled",
+                }
+                for subgroup in group.groups
+            ],
+            "tags": [
+                {"name": self.get_tag_name(tag_id), "id": tag_id[:8]}
+                for tag_id in group.tags
+            ],
+        }
 
-        source_filename = media_object.metadata.get("source_filename")
-        if source_filename:
-            output.append(f"source_filename: {source_filename}")
+        if output == "str":
+            return self._format_query_str(data)
+        return data
 
-        if media_object.file_path:
-            output.append(f"file_path: {media_object.file_path}")
+    def query_tag(self, tag_identifier, output="dict"):
+        tag = self.fetch_tag(tag_identifier)
 
-        if media_object.text:
-            token_count = call_tiktoken(media_object.text)["count"]
-            output.append(f"text: Exists ({token_count} tokens)")
+        data = {
+            "id": tag["id"],
+            "name": tag["name"],
+            "description": tag.get("description"),
+            "parents": [
+                {"name": self.get_tag_name(parent), "id": parent[:8]}
+                for parent in tag.get("parents", [])
+            ],
+            "objects": [
+                {
+                    "id": obj.id[:8],
+                    "name": obj.metadata.get("name", "")
+                    if obj.metadata.get("name")
+                    else obj.metadata.get("source_filename", ""),
+                }
+                for obj in self.media_objects
+                if any(t["id"] == tag["id"] for t in obj.metadata.get("tags", []))
+            ],
+            "transcripts": [
+                {"id": entry["id"][:8], "media_object_id": obj.id[:8]}
+                for obj in self.media_objects
+                for entry in getattr(obj, "transcripts", [])
+                if any(t["id"] == tag["id"] for t in entry.get("tags", []))
+            ],
+            "speech_data": [
+                {"id": entry["id"][:8], "media_object_id": obj.id[:8]}
+                for obj in self.media_objects
+                for entry in getattr(obj, "speech_data", [])
+                if any(t["id"] == tag["id"] for t in entry.get("tags", []))
+            ],
+            "groups": [
+                {"id": group.id[:8], "name": group.name if group.name else "untitled"}
+                for group in self.groups
+                if tag["id"] in group.tags
+            ],
+        }
 
-        groups = []
-        for group in self.groups:
-            if any(obj.id == media_object.id for obj in group.objects):
-                groups.append(group)
-        if groups:
-            output.append(f"groups: {', '.join([group.name for group in groups])}")
+        if output == "str":
+            return self._format_query_str(data)
+        return data
 
-        if media_object.metadata.get("tags"):
-            tags = [
-                self.get_tag_name(tag["id"])
-                for tag in media_object.metadata.get("tags")
-            ]
-            output.append(f"tags: {', '.join(tags)}")
+    def _format_query_str(self, data):
+        def format_dict(d, indent=0):
+            output = []
+            for key, value in d.items():
+                if value is None or value == [] or value == {}:
+                    continue
+                if isinstance(value, dict):
+                    output.append(f"{' ' * indent}{key}:")
+                    output.extend(format_dict(value, indent + 2))
+                elif isinstance(value, list):
+                    output.append(f"{' ' * indent}{key}:")
+                    for item in value:
+                        if isinstance(item, dict):
+                            output.append(f"{' ' * (indent + 2)}- {item.get('id', '')}")
+                            if "name" in item:
+                                output[-1] += f" ({item['name']})"
+                        else:
+                            output.append(f"{' ' * (indent + 2)}- {item}")
+                else:
+                    output.append(f"{' ' * indent}{key}: {value}")
+            return output
 
-        if media_object.processed_text:
-            output.append(f"processed_text: {len(media_object.processed_text)} entries")
-
-        if hasattr(media_object, "transcripts"):
-            output.append(f"transcripts: {len(media_object.transcripts)} entries")
-
-        if hasattr(media_object, "speech_data"):
-            output.append(f"speech_data: {len(media_object.speech_data)} entries")
-
-        if hasattr(media_object, "participants"):
-            output.append(f"participants: {len(media_object.participants)} entries")
-        if hasattr(media_object, "messages"):
-            output.append(f"messages: {len(media_object.messages)} entries")
-        if (
-            hasattr(media_object, "chat_metadata")
-            and len(media_object.chat_metadata) > 0
-        ):
-            output.append(f"chat_metadata: {len(media_object.chat_metadata)} entries")
-
-        return "\n".join(output)
+        return "\n".join(format_dict(data))
 
     def search(
         self,
@@ -406,43 +493,31 @@ class Library:
         else:
             raise ValueError(f"No group found with identifier: {group_identifier}")
 
-    def query_group(self, group_id):
-        group = self.fetch_group(group_id)
-        if not group:
-            raise ValueError(f"No group found with ID: {group_id}")
-
-        output = [
-            f"id: {group.id}",
-            f"name: {group.name if group.name else 'untitled'}",
-            f"created_by: {group.created_by}",
-            f"date_created: {group.date_created}",
-            f"description: {group.description[:40]}",
-        ]
-
-        if group.objects:
-            object_details = []
-            for obj in group.objects:
-                name = obj.metadata.get("name")
-                source_filename = obj.metadata.get("source_filename", "Unnamed")
-                if name:
-                    display_name = name
-                else:
-                    display_name = source_filename
-                object_details.append(f"{obj.id[:5]} ({display_name})")
-            output.append(f"objects: {', '.join(object_details)}")
-
-        if group.groups:
-            subgroup_details = [
-                f"{subgroup.name if subgroup.name else 'untitled'} ({subgroup.id[:6]})"
-                for subgroup in group.groups
+    def fetch_tag(self, tag_identifier):
+        tag = next(
+            (tag for tag in self.tags if tag["id"].startswith(tag_identifier)), None
+        )
+        if not tag:
+            potential_matches = [
+                tag
+                for tag in self.tags
+                if tag["name"].lower() == tag_identifier.lower()
             ]
-            output.append(f"subgroups: {', '.join(subgroup_details)}")
-
-        if group.tags:
-            tags = [self.get_tag_name(tag_id) for tag_id in group.tags]
-            output.append(f"tags: {', '.join(tags)}")
-
-        return "\n".join(output)
+            if len(potential_matches) == 1:
+                tag = potential_matches[0]
+            elif len(potential_matches) > 1:
+                conflict_details = "\n".join(
+                    [
+                        f"{match['name']} (ID: {match['id']})"
+                        for match in potential_matches
+                    ]
+                )
+                raise ValueError(
+                    f"Multiple matches found for tag '{tag_identifier}':\n{conflict_details}"
+                )
+            else:
+                raise ValueError(f"No tag found with identifier: {tag_identifier}")
+        return tag
 
     def delete_group(self, group_id):
         group = self.fetch_group(group_id)
@@ -987,93 +1062,6 @@ class Library:
             )
         else:
             raise ValueError(f"No close match found for tag: {target}")
-
-    def query_tag(self, tag_identifier):
-        # find by ID or name
-        tag = next(
-            (tag for tag in self.tags if tag["id"].startswith(tag_identifier)), None
-        )
-        if not tag:
-            # check if identifier is a name
-            potential_matches = [
-                tag
-                for tag in self.tags
-                if tag["name"].lower() == tag_identifier.lower()
-            ]
-            if len(potential_matches) == 1:
-                tag = potential_matches[0]
-            elif len(potential_matches) > 1:
-                conflict_details = "\n".join(
-                    [
-                        f"{match['name']} (ID: {match['id']})"
-                        for match in potential_matches
-                    ]
-                )
-                raise ValueError(
-                    f"Multiple matches found for tag '{tag_identifier}':\n{conflict_details}"
-                )
-            else:
-                raise ValueError(f"No tag found with identifier: {tag_identifier}")
-
-        output = [
-            f"id: {tag['id']}",
-            f"name: {tag['name']}",
-        ]
-
-        if tag.get("description"):
-            output.append(f"description: {tag['description'][:40]}")
-
-        if tag.get("parents"):
-            parent_names = [
-                f"{self.get_tag_name(parent)} ({parent[:6]})"
-                for parent in tag["parents"]
-            ]
-            output.append(f"parents: {', '.join(parent_names)}")
-
-        tagged_objects = []
-        tagged_transcripts = []
-        tagged_speech_data = []
-
-        for obj in self.media_objects:
-            if any(t["id"] == tag["id"] for t in obj.metadata.get("tags", [])):
-                tagged_objects.append(obj)
-            for entry in getattr(obj, "transcripts", []):
-                if any(t["id"] == tag["id"] for t in entry.get("tags", [])):
-                    tagged_transcripts.append((obj, entry))
-            for entry in getattr(obj, "speech_data", []):
-                if any(t["id"] == tag["id"] for t in entry.get("tags", [])):
-                    tagged_speech_data.append((obj, entry))
-
-        if tagged_objects:
-            obj_details = []
-            for obj in tagged_objects:
-                name = obj.metadata.get("name") or obj.metadata.get(
-                    "source_filename", "Unnamed"
-                )
-                obj_details.append(f"{obj.id[:6]} ({name})")
-            output.append(f"objects: {', '.join(obj_details)}")
-
-        if tagged_transcripts:
-            entry_details = []
-            for obj, entry in tagged_transcripts:
-                entry_details.append(f"{entry['id'][:6]}")
-            output.append(f"transcripts: {', '.join(entry_details)}")
-
-        if tagged_speech_data:
-            entry_details = []
-            for obj, entry in tagged_speech_data:
-                entry_details.append(f"{entry['id'][:6]}")
-            output.append(f"speech_data: {', '.join(entry_details)}")
-
-        tagged_groups = [group for group in self.groups if tag["id"] in group.tags]
-        if tagged_groups:
-            group_details = [
-                f"{group.name if group.name else 'untitled'} ({group.id[:6]})"
-                for group in tagged_groups
-            ]
-            output.append(f"groups: {', '.join(group_details)}")
-
-        return "\n".join(output)
 
     def tag_object(self, media_object, tag=None, tag_str=None, source="user"):
         if tag_str:
