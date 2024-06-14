@@ -7,5 +7,6 @@ fuzzywuzzy>=0.18.0
 python_Levenshtein
 pyperclip>=1.8.2
 send2trash>=1.8.3
+sexpdata>=1.0.2
 scikit-learn>=1.5.0
 nomic==3.0.29
