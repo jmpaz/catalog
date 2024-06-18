@@ -1,18 +1,20 @@
+import contextlib
 import os
 import sys
+import tempfile
+from datetime import datetime, timezone
+
 import click
 import pyperclip
-import tempfile
-import contextlib
 import yaml
-from datetime import datetime, timezone
+from contextualize.tokenize import call_tiktoken
 from rich.console import Console
 from rich.table import Table
-from catalog import Library, Group
-from catalog.process import transcribe, process_transcript
+
+from catalog import Group, Library
 from catalog.embed import load_embeddings, reconcile_embeddings, vector_search
+from catalog.process import process_transcript, transcribe
 from catalog.utils import fetch_subtarget_entry, get_available_subtargets
-from contextualize.tokenize import call_tiktoken
 
 
 def prepare_objects(library, query, type="media"):

@@ -1,19 +1,20 @@
 import os
-import uuid
-from datetime import datetime
 import tempfile
-import yt_dlp
+import uuid
 from abc import ABC
+from datetime import datetime
+
+import yt_dlp
+from contextualize.reference import process_text as delimit_text
+
 from catalog.process import format_transcript
 from catalog.utils import (
+    detect_depth,
+    extract_metadata,
+    flatten_markdown,
     format_speech_data,
     format_transcript_nodes,
-    extract_metadata,
-    detect_depth,
-    flatten_markdown,
 )
-
-from contextualize.reference import process_text as delimit_text
 
 
 def can_transcribe(cls):

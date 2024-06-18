@@ -1,7 +1,8 @@
-import os
 import json
-from nomic import embed
+import os
+
 import numpy as np
+from nomic import embed
 from sklearn.metrics.pairwise import cosine_similarity
 
 EMBEDDINGS_PATH = os.path.expanduser("~/.local/share/catalog/embeddings.json")

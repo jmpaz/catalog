@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+
 from sexpdata import loads
 
 
@@ -22,6 +23,7 @@ def resegment_transcript(transcription: dict, processor_params=None):
     def _call_simulator(segments, processor_params):
         """Call the simulator to resegment the transcript."""
         import tempfile
+
         from simulators.sims import run_sim
 
         input_file = tempfile.NamedTemporaryFile()

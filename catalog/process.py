@@ -1,7 +1,8 @@
-from catalog.utils import read_secrets
+import re
 import uuid
 from datetime import datetime
-import re
+
+from catalog.utils import read_secrets
 
 
 def transcribe(
@@ -17,6 +18,7 @@ def transcribe(
 ):
     import torch
     import whisperx
+
     from catalog.utils import clear_memory
 
     if not hasattr(audio_obj, "can_transcribe"):

@@ -1,15 +1,17 @@
-import os
-import yaml
-import sys
-import shutil
-import json
 import hashlib
-from send2trash import send2trash
-from fuzzywuzzy import process as fuzzy_process
+import json
+import os
+import shutil
+import sys
+import uuid
 from datetime import datetime
+
+import yaml
+from fuzzywuzzy import process as fuzzy_process
+from send2trash import send2trash
+
 from catalog.media import MediaObject
 from catalog.utils import fetch_subtarget_entry
-import uuid
 
 
 class Library:
