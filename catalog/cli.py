@@ -270,16 +270,31 @@ def format_entry(entry, entry_type, library):
                 current_index = None
         return depth - 1
 
+    def format_node_content(node, previous_end):
+        def insert_pause(previous_end, current_start, output, pause_duration):
+            if current_start - previous_end > pause_duration:
+                output.append("")
+
+        content = node["content"].strip()
+        speaker = node.get("speaker")
+        result = []
+        if previous_end is not None:
+            pause_duration = 5
+            insert_pause(previous_end, node["start"], result, pause_duration)
+        if speaker:
+            result.append(f"{speaker}: {content}")
+        else:
+            result.append(content)
+        return "\n".join(result), node["end"]
+
     output = []
+    previous_end = None
+
     if entry_type == "transcripts":
-        output.append(f"id: {entry['id']}")
-        output.append(f"date stored: {entry['date_stored']}")
-        output.append(f"params: {entry['params']}")
-        tags = [library.get_tag_name(tag["id"]) for tag in entry.get("tags", [])]
-        output.append("tags: " + ", ".join(tags))
-        output.append("nodes:")
         for node in entry["nodes"]:
-            output.append(f"  {node['content']}")
+            formatted_content, previous_end = format_node_content(node, previous_end)
+            output.append(formatted_content)
+
     elif entry_type == "speech_data":
         output.append(f"id: {entry['id']}")
         output.append(f"date stored: {entry['date_stored']}")
@@ -299,8 +314,10 @@ def format_entry(entry, entry_type, library):
                 )
                 depth = calculate_depth(entry["nodes"], index)
                 indent = "  " * depth
-                output.append(f"{indent}- {message['text']}")
+                text = message["text"].strip()
+                output.append(f"{indent}- {text}")
         output.append("\n============\n")
+
     return "\n".join(output).strip()
 
 
