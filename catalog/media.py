@@ -46,15 +46,12 @@ class MediaObject(ABC):
             "url": url,
             "date_created": None,
             "date_modified": None,
-            "date_stored": None,
+            "date_stored": datetime.now().isoformat(),
             "source_filename": source_filename or os.path.basename(self.file_path)
             if self.file_path
             else None,
         }
         self.description = ""
-
-        if not self.metadata["date_stored"]:
-            self.metadata["date_stored"] = datetime.now().isoformat()
 
         if self.file_path:
             self.import_file(self.file_path)
@@ -62,12 +59,16 @@ class MediaObject(ABC):
             self.import_url(url)
 
     def import_file(self, file_path):
-        if os.path.isfile(file_path):
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"No file found at {file_path}")
+
+        if (
+            self.metadata["date_created"] is None
+            or self.metadata["date_modified"] is None
+        ):
             self.metadata["date_created"], self.metadata["date_modified"] = (
                 self.get_file_dates(file_path)
             )
-        else:
-            raise FileNotFoundError(f"No file found at {file_path}")
 
     def import_url(self, url):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -131,13 +132,10 @@ class MediaObject(ABC):
 
     @staticmethod
     def get_file_dates(file_path):
-        if os.path.isfile(file_path):
-            stat = os.stat(file_path)
-            date_created = datetime.fromtimestamp(stat.st_ctime)
-            date_modified = datetime.fromtimestamp(stat.st_mtime)
-            return date_created, date_modified
-        else:
-            return None, None
+        stat = os.stat(file_path)
+        date_created = datetime.fromtimestamp(stat.st_ctime).isoformat()
+        date_modified = datetime.fromtimestamp(stat.st_mtime).isoformat()
+        return date_created, date_modified
 
     def set_text(self):
         pass
