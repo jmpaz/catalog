@@ -76,7 +76,7 @@ def cli():
 @click.option(
     "--action",
     "-a",
-    type=click.Choice(["edit", "play"]),
+    type=click.Choice(["nvim", "play"]),
     help="Perform an action on the queried object: edit text in nvim (as tempfile) or play media in mpv.",
 )
 @click.option(
@@ -207,15 +207,15 @@ def query_command(
 
     if action:
         output = None  # do not output to console
-        if action == "edit":
+        if action == "nvim":
             if isinstance(result, str):
                 with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
                     temp_file.write(result)
                     temp_file_path = temp_file.name
-                os.system(f"nvim {temp_file_path} -R")
+                os.system(f"nvim {temp_file_path} -c 'setfiletype markdown'")
                 os.unlink(temp_file_path)
             else:
-                click.echo("The 'edit' option can only be used with string values.")
+                click.echo("The 'nvim' option can only be used with string values.")
         elif action == "play":
             from catalog.media import Audio, Video
 
