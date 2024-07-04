@@ -41,9 +41,11 @@ def resegment_transcript(transcription: dict, processor_params=None):
             input_paths=input_paths,
             example_paths=example_paths,
             inference_fn=processor_params.get("inference_fn", None),
+            provider=processor_params.get("provider", "claude-bedrock"),
             model=processor_params.get("model", "claude-sonnet"),
             temperature=processor_params.get("temperature", 0.4),
             max_tokens=processor_params.get("max_tokens", 4096),
+            data_dir=processor_params.get("data_dir", "~/.local/share/catalog"),
             debug=processor_params.get("debug", False),
         )
 
