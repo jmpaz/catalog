@@ -1,4 +1,4 @@
-git+https://github.com/m-bain/whisperX.git
+whisperx==3.1.5
 contextualize==0.0.3
 yt-dlp==2023.11.16
 click>=8.1.7
