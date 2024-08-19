@@ -212,7 +212,9 @@ def query_command(
                 with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
                     temp_file.write(result)
                     temp_file_path = temp_file.name
-                os.system(f"nvim {temp_file_path} -c 'setfiletype markdown'")
+                os.system(
+                    f"nvim {temp_file_path} -c 'setfiletype markdown' -c 'set wrap'"
+                )
                 os.unlink(temp_file_path)
             else:
                 click.echo("The 'nvim' option can only be used with string values.")
