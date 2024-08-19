@@ -1514,13 +1514,19 @@ def search_command(
         if not query:
             return
 
+    console = Console()
+    table = Table(show_header=True, header_style="bold magenta", show_lines=True)
+    table.add_column("", style="cyan", justify="right")
+    table.add_column("result", style="white")
+    table.add_column("locator", style="yellow")
+
     if use_embeddings or mode == "embeddings":
         embeddings, locators = load_embeddings()
         search_results = vector_search(
             query, embeddings, locators, top_k=max_results, device="gpu"
         )
-        for i, result in enumerate(search_results, 1):
-            click.echo(f"- {result[0]}")
+        for i, (locator, score) in enumerate(search_results, 1):
+            table.add_row(str(i), f"{score:.4f}", locator, "N/A")
     else:
         search_results = library.search(
             query=query,
@@ -1530,12 +1536,17 @@ def search_command(
             ignore_case=not case_sensitive,
             full_search=search_all,
         )
-        for result, locator in search_results:
-            click.echo(f"- {result} ({locator})")
+        for i, (result, locator) in enumerate(search_results, 1):
+            table.add_row(
+                str(i),
+                result[:100] + ("..." if len(result) > 100 else ""),
+                locator,
+            )
 
     if not search_results:
         click.echo("No results found.")
-        return
+    else:
+        console.print(table)
 
 
 @click.command(
