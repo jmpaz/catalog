@@ -213,7 +213,7 @@ def query_command(
                     temp_file.write(result)
                     temp_file_path = temp_file.name
                 os.system(
-                    f"nvim {temp_file_path} -c 'setfiletype markdown' -c 'set wrap'"
+                    f"nvim {temp_file_path} -c 'setfiletype markdown' -c 'set wrap' -c 'set nonumber' -c 'set norelativenumber'"
                 )
                 os.unlink(temp_file_path)
             else:
