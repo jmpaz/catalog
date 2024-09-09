@@ -10,9 +10,9 @@ Its features were designed with this use case in mind, but the working plan is t
 
 ## Installation
 
-Install with pip (or pipx for a global installation):
+Install with `uv`:
 ```bash
-pip install git+https://github.com/jmpaz/catalog.git
+uv pip install git+https://github.com/jmpaz/catalog.git
 ```
 
 
@@ -36,4 +36,3 @@ For a full list of commands and options, use `catalog --help`.
 - metadata and transcriptions in a single JSON file located at `$XDG_CONFIG_HOME/catalog/library.json`.
 - copies of imported media files in `~/.local/share/catalog/datastore`.
 - embeddings for entry text in `~/.local/share/catalog/embeddings.json`.
-

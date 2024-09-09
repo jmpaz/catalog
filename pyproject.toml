@@ -1,0 +1,40 @@
+[project]
+name = "catalog"
+version = "0.0.2"
+description = "Library and CLI for managing and processing media"
+authors = [{ name = "jmpaz" }]
+readme = "README.md"
+requires-python = ">=3.8.0"
+dependencies = [
+    "whisperx==3.1.5",
+    "contextualize==0.0.3",
+    "yt-dlp==2023.11.16",
+    "click>=8.1.7",
+    "rich>=13.7.1",
+    "fuzzywuzzy>=0.18.0",
+    "python_Levenshtein",
+    "pyperclip>=1.8.2",
+    "send2trash>=1.8.3",
+    "sexpdata>=1.0.2",
+    "scikit-learn>=1.5.0",
+    "nomic==3.0.29",
+    "transformers==4.39.3",
+    "numpy>=1.24.3,<2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/jmpaz/catalog"
+
+[project.scripts]
+catalog = "catalog.cli:cli"
+
+[tool.setuptools]
+packages = ["catalog"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
